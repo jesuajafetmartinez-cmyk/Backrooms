@@ -132,7 +132,7 @@
 
     <div id="start-screen">
         <h1 style="color: #c2b144; margin-bottom: 10px;">THE BACKROOMS</h1>
-        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">Encuentra la llave y el cofre para armarte. ¡El monstruo despertará cuando recojas las balas!</p>
+        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">Busca la llave, abre el cofre para conseguir el arma y luego toma las balas. ¡El monstruo solo aparecerá al tomar las balas!</p>
         
         <div class="controls-selector">
             <label>MODO DE CÁMARA (ROTACIÓN):</label>
@@ -206,7 +206,7 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
-        // El monstruo inicia INACTIVO
+        // El monstruo NACE INACTIVO
         let monster = { x: 14.5, y: 14.5, speed: 0.052, active: false, hp: 2 };
 
         let keyItem = { x: 1.5, y: 14.5, collected: false };
@@ -258,7 +258,7 @@
             let mOsc = audioCtx.createOscillator();
             monsterGain = audioCtx.createGain();
             mOsc.type = 'sawtooth'; mOsc.frequency.setValueAtTime(35, audioCtx.currentTime);
-            monsterGain.gain.setValueAtTime(0, audioCtx.currentTime); // Inicia silenciado
+            monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
             mOsc.connect(monsterGain); monsterGain.connect(audioCtx.destination);
             mOsc.start();
 
@@ -364,7 +364,8 @@
                 player.x = 1.5; player.y = 1.5;
                 monster.x = 14.5; monster.y = 14.5;
                 monster.hp = 2;
-                monster.active = false; // Desactivar monstruo tras morir
+                monster.active = false;
+                if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
                 hasGun = false;
                 hasAmmo = false;
                 keyItem.collected = false;
@@ -436,7 +437,11 @@
         }
 
         function updateMonsterAI() {
-            if (!monster.active) return;
+            // SI NO ESTÁ ACTIVO, SE SALE DIRECTAMENTE
+            if (!monster.active) {
+                if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                return;
+            }
 
             let mdx = player.x - monster.x;
             let mdy = player.y - monster.y;
@@ -504,9 +509,10 @@
             if (canMoveTo(player.x + dx, player.y)) player.x += dx;
             if (canMoveTo(player.x, player.y + dy)) player.y += dy;
 
+            // IA DEL MONSTRUO
             updateMonsterAI();
 
-            // Lógica de distancias a los objetivos
+            // OBJETIVOS DE BÚSQUEDA
             let targetObj = null;
             let objName = "";
             let objIcon = "";
@@ -545,6 +551,7 @@
                 trackerEl.innerText = "OBJETIVO: ¡ELIMINA AL MONSTRUO! 💥";
             }
 
+            // RECOLECCIÓN DE OBJETOS
             if (!keyItem.collected) {
                 let kdx = keyItem.x - player.x; let kdy = keyItem.y - player.y;
                 if (Math.sqrt(kdx*kdx + kdy*kdy) < 0.75) {
@@ -564,13 +571,13 @@
                 }
             }
 
-            // AHORA: El monstruo despierta JUSTO AL AGARRAR LAS BALAS
+            // EL MONSTRUO APARECE ÚNICAMENTE AL RECOGER LAS BALAS
             if (ammoItem.visible && !ammoItem.collected) {
                 let adx = ammoItem.x - player.x; let ady = ammoItem.y - player.y;
                 if (Math.sqrt(adx*adx + ady*ady) < 0.8) {
                     ammoItem.collected = true;
                     hasAmmo = true;
-                    monster.active = true; // <--- SE ACTIVA AQUÍ
+                    monster.active = true; // <--- AQUÍ SE DESPIERTA Y EMPIEZA A PERSEGUIR
                     playPickupSound();
                     document.getElementById('btn-shoot').style.display = 'flex';
                 }
@@ -689,7 +696,7 @@
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            // Solo renderizar al monstruo si está ACTIVO
+            // SOLO DIBUJA AL MONSTRUO SI ESTÁ ACTIVO
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -725,6 +732,7 @@
     </script>
 </body>
 </html>
+
 
 
 
