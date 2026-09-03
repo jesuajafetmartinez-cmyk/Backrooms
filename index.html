@@ -206,7 +206,6 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
-        // El monstruo NACE INACTIVO
         let monster = { x: 14.5, y: 14.5, speed: 0.052, active: false, hp: 2 };
 
         let keyItem = { x: 1.5, y: 14.5, collected: false };
@@ -354,32 +353,38 @@
         }
 
         function triggerJumpscare() {
+            if (isDead) return;
+            isDead = true;
             playScream();
             const overlay = document.getElementById('jumpscare-overlay');
             overlay.style.display = 'flex';
-            isDead = true;
 
             setTimeout(() => {
                 overlay.style.display = 'none';
-                player.x = 1.5; player.y = 1.5;
+                player.x = 1.5; player.y = 1.5; player.angle = 0;
+                
                 monster.x = 14.5; monster.y = 14.5;
                 monster.hp = 2;
                 monster.active = false;
                 if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
                 hasGun = false;
                 hasAmmo = false;
                 keyItem.collected = false;
                 chestItem.opened = false;
                 ammoItem.collected = false;
                 ammoItem.visible = false;
+
                 crosshairEl.style.display = 'none';
                 document.getElementById('btn-shoot').style.display = 'none';
+                
                 statusEl.innerText = "ESTADO: Zona segura. Todo está tranquilo...";
                 statusEl.style.borderColor = "#444";
                 statusEl.style.color = "#888";
                 vignetteEl.style.background = `radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%)`;
+                
                 isDead = false;
-            }, 1000);
+            }, 1200);
         }
 
         function shoot() {
@@ -437,7 +442,6 @@
         }
 
         function updateMonsterAI() {
-            // SI NO ESTÁ ACTIVO, SE SALE DIRECTAMENTE
             if (!monster.active) {
                 if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
                 return;
@@ -509,10 +513,8 @@
             if (canMoveTo(player.x + dx, player.y)) player.x += dx;
             if (canMoveTo(player.x, player.y + dy)) player.y += dy;
 
-            // IA DEL MONSTRUO
             updateMonsterAI();
 
-            // OBJETIVOS DE BÚSQUEDA
             let targetObj = null;
             let objName = "";
             let objIcon = "";
@@ -551,7 +553,6 @@
                 trackerEl.innerText = "OBJETIVO: ¡ELIMINA AL MONSTRUO! 💥";
             }
 
-            // RECOLECCIÓN DE OBJETOS
             if (!keyItem.collected) {
                 let kdx = keyItem.x - player.x; let kdy = keyItem.y - player.y;
                 if (Math.sqrt(kdx*kdx + kdy*kdy) < 0.75) {
@@ -571,13 +572,12 @@
                 }
             }
 
-            // EL MONSTRUO APARECE ÚNICAMENTE AL RECOGER LAS BALAS
             if (ammoItem.visible && !ammoItem.collected) {
                 let adx = ammoItem.x - player.x; let ady = ammoItem.y - player.y;
                 if (Math.sqrt(adx*adx + ady*ady) < 0.8) {
                     ammoItem.collected = true;
                     hasAmmo = true;
-                    monster.active = true; // <--- AQUÍ SE DESPIERTA Y EMPIEZA A PERSEGUIR
+                    monster.active = true;
                     playPickupSound();
                     document.getElementById('btn-shoot').style.display = 'flex';
                 }
@@ -696,7 +696,6 @@
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            // SOLO DIBUJA AL MONSTRUO SI ESTÁ ACTIVO
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -732,6 +731,7 @@
     </script>
 </body>
 </html>
+
 
 
 
