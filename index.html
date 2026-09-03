@@ -2,45 +2,43 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Backrooms</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
-        #canvas { width: 100vw; height: 100vh; display: block; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
+        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* UI y Controles Táctiles */
-        .touch-zone { position: absolute; top: 0; bottom: 0; width: 30%; z-index: 10; }
-        #left-zone { left: 0; }
-        #right-zone { right: 0; }
-        
-        #move-controls {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 20px;
-            z-index: 20;
-        }
+        /* Capa de Controles */
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         .btn {
+            position: absolute;
             background: rgba(0, 0, 0, 0.6);
             border: 2px solid #e0c93a;
             color: #fff;
-            padding: 16px 28px;
-            font-size: 18px;
             font-weight: bold;
-            border-radius: 12px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
             touch-action: manipulation;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        .btn:active { background: rgba(224, 201, 58, 0.4); }
+        .btn:active { background: rgba(224, 201, 58, 0.6); }
+
+        /* Botones de Movimiento */
+        #btn-fwd { bottom: 100px; left: 60px; width: 65px; height: 65px; font-size: 24px; }
+        #btn-back { bottom: 20px; left: 60px; width: 65px; height: 65px; font-size: 24px; }
         
+        /* Botones de Giro */
+        #btn-left { bottom: 40px; right: 100px; width: 65px; height: 65px; font-size: 24px; }
+        #btn-right { bottom: 40px; right: 20px; width: 65px; height: 65px; font-size: 24px; }
+
         #audio-btn {
             position: absolute;
             top: 15px;
             right: 15px;
-            z-index: 30;
+            z-index: 20;
             background: #d9534f;
             border: none;
             color: white;
@@ -48,33 +46,20 @@
             border-radius: 8px;
             font-weight: bold;
             font-size: 14px;
-        }
-        
-        #guide-text {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            color: rgba(255,255,255,0.7);
-            font-size: 12px;
-            z-index: 30;
-            pointer-events: none;
+            pointer-events: auto;
         }
     </style>
 </head>
 <body>
 
-    <div id="guide-text">Toca los lados para girar</div>
     <button id="audio-btn" onclick="initAudio()">🔊 Activar Sonido</button>
     <canvas id="canvas"></canvas>
 
-    <!-- Zonas de giro lateral -->
-    <div id="left-zone" class="touch-zone"></div>
-    <div id="right-zone" class="touch-zone"></div>
-
-    <!-- Botones para moverte -->
-    <div id="move-controls">
-        <button class="btn" id="btn-fwd">▲ Avanzar</button>
-        <button class="btn" id="btn-back">▼ Retroceder</button>
+    <div id="ui">
+        <div class="btn" id="btn-fwd">▲</div>
+        <div class="btn" id="btn-back">▼</div>
+        <div class="btn" id="btn-left">◀</div>
+        <div class="btn" id="btn-right">▶</div>
     </div>
 
     <script>
@@ -88,22 +73,19 @@
         resize();
         window.addEventListener('resize', resize);
 
-        // Mapa de los Backrooms (1 = Pared, 0 = Pasillo)
-        const MAP_SIZE = 10;
+        // Mapa sencillo
+        const MAP_SIZE = 8;
         const map = [
-            [1,1,1,1,1,1,1,1,1,1],
-            [1,0,0,0,0,0,1,0,0,1],
-            [1,0,1,1,0,0,1,0,0,1],
-            [1,0,1,0,0,0,0,0,0,1],
-            [1,0,1,0,1,1,1,1,0,1],
-            [1,0,0,0,1,0,0,1,0,1],
-            [1,1,1,0,1,0,0,1,0,1],
-            [1,0,0,0,0,0,0,0,0,1],
-            [1,0,1,1,1,1,0,1,0,1],
-            [1,1,1,1,1,1,1,1,1,1]
+            [1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,0,1],
+            [1,0,1,0,0,1,0,1],
+            [1,0,0,0,0,0,0,1],
+            [1,0,1,0,1,1,0,1],
+            [1,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1]
         ];
 
-        // Posición inicial despejada
         let player = { x: 1.5, y: 1.5, angle: 0 };
         let keys = { fwd: false, back: false, left: false, right: false };
 
@@ -126,69 +108,37 @@
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
                 osc.type = 'triangle';
-                osc.frequency.setValueAtTime(70 + Math.random()*20, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                osc.frequency.setValueAtTime(60 + Math.random()*20, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.12);
+                osc.stop(audioCtx.currentTime + 0.1);
             } catch(e) {}
         }
 
-        // Controles de botones táctiles
-        const btnFwd = document.getElementById('btn-fwd');
-        const btnBack = document.getElementById('btn-back');
+        // Asignación de botones táctiles
+        function bindBtn(id, key) {
+            const el = document.getElementById(id);
+            const start = (e) => { e.preventDefault(); keys[key] = true; initAudio(); };
+            const stop = (e) => { e.preventDefault(); keys[key] = false; };
+            el.addEventListener('touchstart', start);
+            el.addEventListener('touchend', stop);
+            el.addEventListener('mousedown', start);
+            el.addEventListener('mouseup', stop);
+        }
 
-        const startFwd = (e) => { e.preventDefault(); keys.fwd = true; initAudio(); };
-        const stopFwd = (e) => { e.preventDefault(); keys.fwd = false; };
-        const startBack = (e) => { e.preventDefault(); keys.back = true; initAudio(); };
-        const stopBack = (e) => { e.preventDefault(); keys.back = false; };
+        bindBtn('btn-fwd', 'fwd');
+        bindBtn('btn-back', 'back');
+        bindBtn('btn-left', 'left');
+        bindBtn('btn-right', 'right');
 
-        btnFwd.addEventListener('touchstart', startFwd);
-        btnFwd.addEventListener('touchend', stopFwd);
-        btnFwd.addEventListener('mousedown', startFwd);
-        btnFwd.addEventListener('mouseup', stopFwd);
-
-        btnBack.addEventListener('touchstart', startBack);
-        btnBack.addEventListener('touchend', stopBack);
-        btnBack.addEventListener('mousedown', startBack);
-        btnBack.addEventListener('mouseup', stopBack);
-
-        // Zonas laterales para rotar
-        const leftZone = document.getElementById('left-zone');
-        const rightZone = document.getElementById('right-zone');
-
-        leftZone.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
-        leftZone.addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
-        leftZone.addEventListener('mousedown', () => keys.left = true);
-        leftZone.addEventListener('mouseup', () => keys.left = false);
-
-        rightZone.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
-        rightZone.addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
-        rightZone.addEventListener('mousedown', () => keys.right = true);
-        rightZone.addEventListener('mouseup', () => keys.right = false);
-
-        // Teclado
-        window.addEventListener('keydown', (e) => {
-            if(e.key==='w'||e.key==='ArrowUp') keys.fwd = true;
-            if(e.key==='s'||e.key==='ArrowDown') keys.back = true;
-            if(e.key==='a'||e.key==='ArrowLeft') keys.left = true;
-            if(e.key==='d'||e.key==='ArrowRight') keys.right = true;
-            initAudio();
-        });
-        window.addEventListener('keyup', (e) => {
-            if(e.key==='w'||e.key==='ArrowUp') keys.fwd = false;
-            if(e.key==='s'||e.key==='ArrowDown') keys.back = false;
-            if(e.key==='a'||e.key==='ArrowLeft') keys.left = false;
-            if(e.key==='d'||e.key==='ArrowRight') keys.right = false;
-        });
-
-        // Lógica de Movimiento
+        // Bucle de juego
         let stepTimer = 0;
         function update() {
-            let moveSpeed = 0.035;
-            let rotSpeed = 0.04;
+            let moveSpeed = 0.04;
+            let rotSpeed = 0.05;
 
             if (keys.left) player.angle -= rotSpeed;
             if (keys.right) player.angle += rotSpeed;
@@ -203,33 +153,24 @@
                 dy -= Math.sin(player.angle) * moveSpeed;
             }
 
-            // Detección de colisión amplia
-            let margin = 0.25;
-            let checkX = player.x + dx + Math.sign(dx) * margin;
-            let checkY = player.y + dy + Math.sign(dy) * margin;
+            // Colisiones
+            if (map[Math.floor(player.y)][Math.floor(player.x + dx * 2)] === 0) player.x += dx;
+            if (map[Math.floor(player.y + dy * 2)][Math.floor(player.x)] === 0) player.y += dy;
 
-            if (map[Math.floor(player.y)][Math.floor(checkX)] === 0) player.x += dx;
-            if (map[Math.floor(checkY)][Math.floor(player.x)] === 0) player.y += dy;
-
-            // Pasos
             if (keys.fwd || keys.back) {
                 stepTimer++;
-                if (stepTimer % 18 === 0) playStepSound();
+                if (stepTimer % 15 === 0) playStepSound();
             }
         }
 
-        // Renderizado 3D Raycasting
         function render() {
-            // Techo oscuro
-            ctx.fillStyle = '#0a0a05';
+            ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
-
-            // Alfombra húmeda (Suelo)
-            ctx.fillStyle = '#2b2610';
+            ctx.fillStyle = '#221e0a';
             ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
 
             const fov = Math.PI / 3;
-            const numRays = Math.floor(canvas.width / 3);
+            const numRays = Math.floor(canvas.width / 4);
             const rayWidth = canvas.width / numRays;
 
             for (let i = 0; i < numRays; i++) {
@@ -240,8 +181,8 @@
                 let cos = Math.cos(rayAngle);
                 let sin = Math.sin(rayAngle);
 
-                while (!hit && distance < 9) {
-                    distance += 0.04;
+                while (!hit && distance < 8) {
+                    distance += 0.05;
                     let checkX = Math.floor(player.x + cos * distance);
                     let checkY = Math.floor(player.y + sin * distance);
 
@@ -250,17 +191,11 @@
                     }
                 }
 
-                // Corrección de distorsión
                 let correctedDist = distance * Math.cos(rayAngle - player.angle);
                 let wallHeight = (canvas.height / (correctedDist + 0.1));
 
-                // Iluminación amarillenta (Estilo linterna/luz húmeda)
-                let shadow = Math.max(0, 1 - (correctedDist / 7));
-                let r = Math.floor(210 * shadow);
-                let g = Math.floor(185 * shadow);
-                let b = Math.floor(60 * shadow);
-
-                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                let shadow = Math.max(0, 1 - (correctedDist / 6));
+                ctx.fillStyle = `rgb(${200 * shadow}, ${170 * shadow}, ${40 * shadow})`;
                 ctx.fillRect(i * rayWidth, (canvas.height - wallHeight) / 2, rayWidth + 1, wallHeight);
             }
         }
@@ -275,4 +210,4 @@
     </script>
 </body>
 </html>
-
+ 
