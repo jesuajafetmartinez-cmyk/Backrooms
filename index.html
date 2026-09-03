@@ -1,319 +1,250 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>The Backrooms: Horrores de la Liminalidad</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; touch-action: none; }
-    body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; }
-    #canvas { width: 100vw; height: 100vh; display: block; filter: contrast(1.1) brightness(0.9); }
-    
-    /* Zonas Táctiles */
-    #zone-left { position: absolute; top: 0; left: 0; width: 50vw; height: 100vh; z-index: 10; }
-    #zone-right { position: absolute; top: 0; right: 0; width: 50vw; height: 100vh; z-index: 10; }
-    
-    /* Joystick */
-    #joy-base {
-      position: absolute; width: 100px; height: 100px;
-      background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 50%; display: none; z-index: 20; pointer-events: none;
-    }
-    #joy-stick {
-      position: absolute; width: 40px; height: 40px; background: rgba(200, 0, 0, 0.5);
-      border-radius: 50%; top: 30px; left: 30px; pointer-events: none;
-    }
-    
-    /* UI Estilo Cámara VHS */
-    #vhs-ui {
-      position: absolute; top: 20px; left: 20px; color: #0f0;
-      font-size: 16px; text-shadow: 0 0 5px #0f0; z-index: 5; pointer-events: none;
-    }
-    #vhs-rec {
-      position: absolute; top: 20px; right: 20px; color: #f00;
-      font-size: 18px; font-weight: bold; animation: blink 1s infinite; z-index: 5; pointer-events: none;
-    }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-
-    /* Pantalla Game Over */
-    #game-over {
-      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: #000; color: #f00; display: flex; flex-direction: column;
-      justify-content: center; align-items: center; z-index: 30; display: none;
-    }
-    #game-over h1 { font-size: 32px; letter-spacing: 4px; text-shadow: 0 0 10px #f00; }
-    #game-over button {
-      margin-top: 30px; padding: 12px 30px; font-size: 16px; background: #300;
-      color: #f00; border: 1px solid #f00; cursor: pointer; font-family: monospace;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>The Backrooms</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        #canvas { width: 100vw; height: 100vh; display: block; }
+        
+        /* UI y Controles Táctiles */
+        .touch-zone { position: absolute; top: 0; bottom: 0; width: 25%; z-index: 10; }
+        #left-zone { left: 0; }
+        #right-zone { right: 0; }
+        
+        #move-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 20;
+        }
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 15px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            touch-action: manipulation;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.5); }
+        
+        #audio-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 30;
+            background: #d9534f;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 
-  <div id="vhs-ui">CAM 01 - NIVEL 0<br><span id="timer">00:00:00</span></div>
-  <div id="vhs-rec">● REC</div>
-  <canvas id="canvas"></canvas>
+    <button id="audio-btn" onclick="initAudio()">🔊 Activar Sonido</button>
+    <canvas id="canvas"></canvas>
 
-  <div id="zone-left"></div>
-  <div id="zone-right"></div>
-  <div id="joy-base"><div id="joy-stick"></div></div>
+    <!-- Zonas de giro lateral -->
+    <div id="left-zone" class="touch-zone"></div>
+    <div id="right-zone" class="touch-zone"></div>
 
-  <div id="game-over">
-    <h1>NO ESTÁS SOLO</h1>
-    <p style="color: #666; margin-top: 10px;">Tu presencia fue consumida.</p>
-    <button onclick="restart()">REINTENTAR</button>
-  </div>
+    <!-- Botones para moverte -->
+    <div id="move-controls">
+        <button class="btn" id="btn-fwd">▲ Avanzar</button>
+        <button class="btn" id="btn-back">▼ Retroceder</button>
+    </div>
 
-  <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
-    // Resolución interna baja para rendimiento fluido y estética retro
-    function resize() {
-      canvas.width = Math.floor(window.innerWidth / 2.5);
-      canvas.height = Math.floor(window.innerHeight / 2.5);
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    // --- GENERADOR DE TEXTURAS EN CANVAS ---
-    const texSize = 64;
-    
-    // Textura Pared (Papel tapiz desgastado)
-    const wallTex = document.createElement('canvas');
-    wallTex.width = wallTex.height = texSize;
-    const wCtx = wallTex.getContext('2d');
-    wCtx.fillStyle = '#bfa852'; wCtx.fillRect(0,0,texSize,texSize);
-    wCtx.fillStyle = '#9e893c';
-    for(let i=0; i<texSize; i+=8) {
-      wCtx.fillRect(i, 0, 2, texSize);
-      wCtx.fillRect(0, i, texSize, 2);
-    }
-    // Manchas/Suciedad
-    wCtx.fillStyle = 'rgba(50,40,10,0.15)';
-    for(let i=0; i<30; i++) {
-      wCtx.fillRect(Math.random()*texSize, Math.random()*texSize, Math.random()*8, Math.random()*8);
-    }
-
-    // Mapa (1: Pared, 0: Pasillo)
-    const mapSize = 16;
-    const map = [
-      1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-      1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1,
-      1,0,1,0,1,0,1,1,1,1,0,1,0,1,0,1,
-      1,0,1,0,0,0,0,0,0,1,0,0,0,1,0,1,
-      1,0,1,1,1,1,0,1,0,1,1,1,0,1,0,1,
-      1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,
-      1,1,1,1,0,1,0,1,1,1,1,0,1,1,1,1,
-      1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,
-      1,0,1,1,1,1,1,1,0,0,1,1,1,1,0,1,
-      1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,
-      1,0,1,0,1,1,0,1,1,1,1,1,0,1,0,1,
-      1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1,
-      1,1,1,0,1,0,1,1,1,1,0,1,0,1,1,1,
-      1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,1,
-      1,0,1,1,1,0,0,0,0,0,0,1,1,1,0,1,
-      1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-    ];
-
-    // Jugador
-    let player = { x: 2.5, y: 2.5, dirX: 1, dirY: 0, planeX: 0, planeY: 0.66, moveSpeed: 0.035, rotSpeed: 0.003 };
-
-    // Entidad
-    let entity = { x: 13.5, y: 13.5, speed: 0.02, active: true };
-
-    // Controles
-    let joyActive = false, joyStart = {x:0, y:0}, joyMove = {x:0, y:0};
-    let rightTouchId = null, lastRightX = 0;
-
-    const joyBase = document.getElementById('joy-base');
-    const joyStick = document.getElementById('joy-stick');
-
-    document.getElementById('zone-left').addEventListener('touchstart', e => {
-      let t = e.changedTouches[0];
-      joyActive = true; joyStart = { x: t.clientX, y: t.clientY }; joyMove = { x: 0, y: 0 };
-      joyBase.style.display = 'block'; joyBase.style.left = (t.clientX - 50)+'px'; joyBase.style.top = (t.clientY - 50)+'px';
-    });
-
-    document.getElementById('zone-left').addEventListener('touchmove', e => {
-      if(!joyActive) return;
-      let t = e.changedTouches[0];
-      let dx = t.clientX - joyStart.x, dy = t.clientY - joyStart.y;
-      let dist = Math.hypot(dx, dy), maxD = 40;
-      if(dist > maxD) { dx = (dx/dist)*maxD; dy = (dy/dist)*maxD; }
-      joyMove = { x: dx/maxD, y: dy/maxD };
-      joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
-    });
-
-    const endJoy = () => { joyActive = false; joyMove = {x:0, y:0}; joyBase.style.display = 'none'; };
-    document.getElementById('zone-left').addEventListener('touchend', endJoy);
-
-    document.getElementById('zone-right').addEventListener('touchstart', e => {
-      let t = e.changedTouches[0];
-      rightTouchId = t.identifier; lastRightX = t.clientX;
-    });
-
-    document.getElementById('zone-right').addEventListener('touchmove', e => {
-      for(let t of e.changedTouches) {
-        if(t.identifier === rightTouchId) {
-          let dx = t.clientX - lastRightX;
-          rotate(dx * player.rotSpeed);
-          lastRightX = t.clientX;
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
-      }
-    });
+        resize();
+        window.addEventListener('resize', resize);
 
-    function rotate(angle) {
-      let oldDirX = player.dirX;
-      player.dirX = player.dirX * Math.cos(angle) - player.dirY * Math.sin(angle);
-      player.dirY = oldDirX * Math.sin(angle) + player.dirY * Math.cos(angle);
-      let oldPlaneX = player.planeX;
-      player.planeX = player.planeX * Math.cos(angle) - player.planeY * Math.sin(angle);
-      player.planeY = oldPlaneX * Math.sin(angle) + player.planeY * Math.cos(angle);
-    }
+        // Configuración del jugador y mapa
+        const MAP_SIZE = 12;
+        const map = [
+            [1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,1,0,0,0,0,0,0,1],
+            [1,0,1,0,1,0,1,1,1,1,0,1],
+            [1,0,1,0,0,0,0,0,0,1,0,1],
+            [1,0,1,1,1,1,0,1,0,1,0,1],
+            [1,0,0,0,0,1,0,1,0,0,0,1],
+            [1,1,1,0,0,1,0,1,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,1,0,1],
+            [1,0,1,1,1,1,1,1,0,1,0,1],
+            [1,0,1,0,0,0,0,1,0,0,0,1],
+            [1,0,0,0,1,0,0,0,0,1,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
 
-    // Actualización
-    function update() {
-      if(joyActive) {
-        let fwd = -joyMove.y * player.moveSpeed;
-        let side = joyMove.x * player.moveSpeed;
-        
-        let nx = player.x + player.dirX * fwd + player.planeX * side;
-        let ny = player.y + player.dirY * fwd + player.planeY * side;
-        
-        if(map[Math.floor(player.y)*mapSize + Math.floor(nx)] === 0) player.x = nx;
-        if(map[Math.floor(ny)*mapSize + Math.floor(player.x)] === 0) player.y = ny;
-      }
+        let player = { x: 2.5, y: 2.5, angle: 0, speed: 0 };
+        let keys = { fwd: false, back: false, left: false, right: false };
 
-      // IA Entidad
-      if(entity.active) {
-        let edx = player.x - entity.x, edy = player.y - entity.y;
-        let dist = Math.hypot(edx, edy);
-        if(dist < 0.4) {
-          document.getElementById('game-over').style.display = 'flex';
-          entity.active = false;
-        } else {
-          entity.x += (edx/dist) * entity.speed;
-          entity.y += (edy/dist) * entity.speed;
-        }
-      }
-    }
+        // Audio sintetizado
+        let audioCtx = null;
+        let isAudioInit = false;
 
-    // Renderizado Raycasting
-    function render() {
-      const w = canvas.width, h = canvas.height;
-      let flicker = Math.random() > 0.96 ? 0.4 : 1.0;
-
-      // Techo y Suelo
-      ctx.fillStyle = `rgb(${20*flicker}, ${20*flicker}, ${10*flicker})`; ctx.fillRect(0, 0, w, h/2);
-      ctx.fillStyle = `rgb(${40*flicker}, ${35*flicker}, ${15*flicker})`; ctx.fillRect(0, h/2, w, h/2);
-
-      let zBuffer = [];
-
-      // Render Paredes con Textura
-      for(let x = 0; x < w; x++) {
-        let cameraX = 2 * x / w - 1;
-        let rayDirX = player.dirX + player.planeX * cameraX;
-        let rayDirY = player.dirY + player.planeY * cameraX;
-
-        let mapX = Math.floor(player.x), mapY = Math.floor(player.y);
-        let deltaDistX = Math.abs(1 / rayDirX), deltaDistY = Math.abs(1 / rayDirY);
-        let stepX, stepY, sideDistX, sideDistY;
-
-        if(rayDirX < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
-        else { stepX = 1; sideDistX = (mapX + 1.0 - player.x) * deltaDistX; }
-        if(rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
-        else { stepY = 1; sideDistY = (mapY + 1.0 - player.y) * deltaDistY; }
-
-        let hit = 0, side = 0;
-        while(hit === 0) {
-          if(sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
-          else { sideDistY += deltaDistY; mapY += stepY; side = 1; }
-          if(map[mapY * mapSize + mapX] > 0) hit = 1;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                document.getElementById('audio-btn').style.background = '#5cb85c';
+                document.getElementById('audio-btn').innerText = '🔊 Audio Listo';
+                isAudioInit = true;
+            }
         }
 
-        let perpWallDist = (side === 0) ? (mapX - player.x + (1 - stepX) / 2) / rayDirX : (mapY - player.y + (1 - stepY) / 2) / rayDirY;
-        zBuffer[x] = perpWallDist;
-
-        let lineHeight = Math.floor(h / perpWallDist);
-        let drawStart = -lineHeight / 2 + h / 2;
-
-        // Cálculo de textura x
-        let wallX;
-        if(side === 0) wallX = player.y + perpWallDist * rayDirY;
-        else wallX = player.x + perpWallDist * rayDirX;
-        wallX -= Math.floor(wallX);
-        let texX = Math.floor(wallX * texSize);
-
-        // Renderizar columna de textura
-        ctx.drawImage(wallTex, texX, 0, 1, texSize, x, drawStart, 1, lineHeight);
-
-        // Sombra de Oscuridad / Niebla
-        let shadow = Math.min(1, perpWallDist / 4);
-        ctx.fillStyle = `rgba(0, 0, 0, ${shadow})`;
-        ctx.fillRect(x, drawStart, 1, lineHeight);
-      }
-
-      // Render Entidad (Terror)
-      if(entity.active) {
-        let sx = entity.x - player.x, sy = entity.y - player.y;
-        let invDet = 1.0 / (player.planeX * player.dirY - player.dirX * player.planeY);
-        let transformX = invDet * (player.dirY * sx - player.dirX * sy);
-        let transformY = invDet * (-player.planeY * sx + player.planeX * sy);
-
-        if(transformY > 0) {
-          let screenX = Math.floor((w / 2) * (1 + transformX / transformY));
-          let eHeight = Math.abs(Math.floor(h / transformY));
-          let eWidth = eHeight;
-
-          if(screenX > 0 && screenX < w && transformY < zBuffer[screenX]) {
-            // Cuerpo Sombra
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(screenX - eWidth/2, h/2 - eHeight/2, eWidth, eHeight);
-            
-            // Ojos Rojos brillantes
-            ctx.fillStyle = '#f00';
-            ctx.shadowColor = '#f00'; ctx.shadowBlur = 10;
-            ctx.fillRect(screenX - eWidth/5, h/2 - eHeight/4, eWidth/8, eHeight/12);
-            ctx.fillRect(screenX + eWidth/10, h/2 - eHeight/4, eWidth/8, eHeight/12);
-            ctx.shadowBlur = 0;
-          }
+        function playStepSound() {
+            if (!isAudioInit || !audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
         }
-      }
 
-      // Efecto Viñeta / Linterna
-      let grad = ctx.createRadialGradient(w/2, h/2, w/6, w/2, h/2, w/1.2);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, 'rgba(0,0,0,0.85)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0,0,w,h);
-    }
+        // Controles de botones
+        const btnFwd = document.getElementById('btn-fwd');
+        const btnBack = document.getElementById('btn-back');
 
-    // Contador de tiempo
-    let startTime = Date.now();
-    function updateTimer() {
-      let diff = Math.floor((Date.now() - startTime) / 1000);
-      let m = String(Math.floor(diff/60)).padStart(2,'0');
-      let s = String(diff%60).padStart(2,'0');
-      document.getElementById('timer').innerText = `00:${m}:${s}`;
-    }
+        btnFwd.addEventListener('touchstart', (e) => { e.preventDefault(); keys.fwd = true; initAudio(); });
+        btnFwd.addEventListener('touchend', () => keys.fwd = false);
+        btnFwd.addEventListener('mousedown', () => keys.fwd = true);
+        btnFwd.addEventListener('mouseup', () => keys.fwd = false);
 
-    function loop() {
-      update();
-      render();
-      updateTimer();
-      requestAnimationFrame(loop);
-    }
+        btnBack.addEventListener('touchstart', (e) => { e.preventDefault(); keys.back = true; initAudio(); });
+        btnBack.addEventListener('touchend', () => keys.back = false);
+        btnBack.addEventListener('mousedown', () => keys.back = true);
+        btnBack.addEventListener('mouseup', () => keys.back = false);
 
-    function restart() {
-      player.x = 2.5; player.y = 2.5;
-      entity.x = 13.5; entity.y = 13.5; entity.active = true;
-      startTime = Date.now();
-      document.getElementById('game-over').style.display = 'none';
-    }
+        // Giro por pulsación en lados de la pantalla
+        const leftZone = document.getElementById('left-zone');
+        const rightZone = document.getElementById('right-zone');
 
-    loop();
-  </script>
+        leftZone.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+        leftZone.addEventListener('touchend', () => keys.left = false);
+        rightZone.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+        rightZone.addEventListener('touchend', () => keys.right = false);
+
+        // Teclado para PC
+        window.addEventListener('keydown', (e) => {
+            if(e.key==='w'||e.key==='ArrowUp') keys.fwd = true;
+            if(e.key==='s'||e.key==='ArrowDown') keys.back = true;
+            if(e.key==='a'||e.key==='ArrowLeft') keys.left = true;
+            if(e.key==='d'||e.key==='ArrowRight') keys.right = true;
+            initAudio();
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.key==='w'||e.key==='ArrowUp') keys.fwd = false;
+            if(e.key==='s'||e.key==='ArrowDown') keys.back = false;
+            if(e.key==='a'||e.key==='ArrowLeft') keys.left = false;
+            if(e.key==='d'||e.key==='ArrowRight') keys.right = false;
+        });
+
+        // Bucle de actualización
+        let stepTimer = 0;
+        function update() {
+            let moveSpeed = 0.04;
+            let rotSpeed = 0.04;
+
+            if (keys.left) player.angle -= rotSpeed;
+            if (keys.right) player.angle += rotSpeed;
+
+            let dx = 0, dy = 0;
+            if (keys.fwd) {
+                dx += Math.cos(player.angle) * moveSpeed;
+                dy += Math.sin(player.angle) * moveSpeed;
+            }
+            if (keys.back) {
+                dx -= Math.cos(player.angle) * moveSpeed;
+                dy -= Math.sin(player.angle) * moveSpeed;
+            }
+
+            // Colisiones simples
+            let newX = player.x + dx;
+            let newY = player.y + dy;
+            if (map[Math.floor(player.y)][Math.floor(newX)] === 0) player.x = newX;
+            if (map[Math.floor(newY)][Math.floor(player.x)] === 0) player.y = newY;
+
+            // Sonido de pasos
+            if (dx !== 0 || dy !== 0) {
+                stepTimer++;
+                if (stepTimer % 18 === 0) playStepSound();
+            }
+        }
+
+        // Raycasting y Renderizado
+        function render() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height/2); // Techo
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, canvas.height/2, canvas.width, canvas.height/2); // Suelo
+
+            const fov = Math.PI / 3;
+            const numRays = canvas.width / 2; // Optimización móvil
+            const rayWidth = canvas.width / numRays;
+
+            for (let i = 0; i < numRays; i++) {
+                let rayAngle = (player.angle - fov / 2) + (i / numRays) * fov;
+                let distance = 0;
+                let hit = false;
+
+                let cos = Math.cos(rayAngle);
+                let sin = Math.sin(rayAngle);
+
+                while (!hit && distance < 10) {
+                    distance += 0.05;
+                    let checkX = Math.floor(player.x + cos * distance);
+                    let checkY = Math.floor(player.y + sin * distance);
+
+                    if (checkX < 0 || checkX >= MAP_SIZE || checkY < 0 || checkY >= MAP_SIZE) {
+                        hit = true;
+                        distance = 10;
+                    } else if (map[checkY][checkX] > 0) {
+                        hit = true;
+                    }
+                }
+
+                // Corregir efecto ojo de pez
+                let correctedDist = distance * Math.cos(rayAngle - player.angle);
+                let wallHeight = (canvas.height / correctedDist);
+
+                // Sombra/Efecto Linterna
+                let brightness = Math.max(0, 1 - (correctedDist / 7));
+                let yellowColor = Math.floor(200 * brightness);
+                let greenColor = Math.floor(180 * brightness);
+
+                ctx.fillStyle = `rgb(${yellowColor}, ${greenColor}, 50)`;
+                ctx.fillRect(i * rayWidth, (canvas.height - wallHeight) / 2, rayWidth + 1, wallHeight);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
 </body>
 </html>
-
