@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Tunnels & Objects</title>
+    <title>The Backrooms - Real Claustrophobia</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; touch-action: none; }
-        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; }
+        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; transition: filter 0.2s ease-out; }
         
         #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         .btn {
@@ -26,15 +26,14 @@
         }
         .btn:active { background: rgba(179, 160, 50, 0.5); }
 
-        #btn-fwd { bottom: 110px; left: 35px; width: 60px; height: 60px; font-size: 20px; }
-        #btn-back { bottom: 35px; left: 35px; width: 60px; height: 60px; font-size: 20px; }
-        #btn-left { bottom: 40px; right: 90px; width: 60px; height: 60px; font-size: 20px; }
-        #btn-right { bottom: 40px; right: 20px; width: 60px; height: 60px; font-size: 20px; }
+        #btn-fwd { bottom: 120px; left: 45px; width: 70px; height: 70px; font-size: 24px; }
+        #btn-back { bottom: 35px; left: 45px; width: 70px; height: 70px; font-size: 24px; }
+        #btn-left { bottom: 45px; right: 105px; width: 70px; height: 70px; font-size: 24px; }
+        #btn-right { bottom: 45px; right: 25px; width: 70px; height: 70px; font-size: 24px; }
         
-        /* Botón de Agacharse */
         #btn-crouch {
-            bottom: 110px; right: 55px; width: 60px; height: 60px; font-size: 11px;
-            border-radius: 12px; border-color: #8b0000; color: #ff6666;
+            bottom: 120px; right: 65px; width: 70px; height: 70px; font-size: 11px;
+            border-radius: 15px; border-color: #8b0000; color: #ff6666;
         }
 
         #audio-btn {
@@ -45,17 +44,17 @@
             background: #2e8b57;
             border: 1px solid #33ff66;
             color: white;
-            padding: 8px 12px;
+            padding: 10px 15px;
             border-radius: 5px;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 13px;
             pointer-events: auto;
         }
 
         #warning {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 20px;
+            left: 20px;
             color: #d4c359;
             font-size: 11px;
             z-index: 20;
@@ -66,7 +65,7 @@
 </head>
 <body>
 
-    <div id="warning">⚠ Nivel 0: "Los Pasillos y Túneles"<br>Busca escaleras para bajar a los túneles.</div>
+    <div id="warning">⚠ Nivel 0<br>Busca escaleras o huye del sonido.</div>
     <button id="audio-btn" onclick="initAudio()">🔊 Activar Sonido</button>
     <canvas id="canvas"></canvas>
 
@@ -75,7 +74,7 @@
         <div class="btn" id="btn-back">▼</div>
         <div class="btn" id="btn-left">◀</div>
         <div class="btn" id="btn-right">▶</div>
-        <div class="btn" id="btn-crouch">⬇ Crouch</div>
+        <div class="btn" id="btn-crouch">⬇ Agachar</div>
     </div>
 
     <script>
@@ -111,53 +110,56 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0, crouched: false, inTunnel: false };
-        let monster = { x: 13.5, y: 13.5, active: true, speed: 0.02 };
+        let monster = { x: 13.5, y: 13.5, active: true, speed: 0.025 };
         let keys = { fwd: false, back: false, left: false, right: false };
 
         // Generar Objetos Cotidianos Aleatorios
         let props = [];
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 15; i++) {
             let rx = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
             let ry = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
             if (mainMap[ry][rx] === 0) {
-                props.push({ x: rx + 0.5, y: ry + 0.5, type: Math.floor(Math.random() * 3) }); // 0: Silla, 1: Caja, 2: Lámpara
+                props.push({ x: rx + 0.5, y: ry + 0.5, type: Math.floor(Math.random() * 3) }); // 0: Silla, 1: Florero, 2: Lámpara
             }
         }
 
         // Audio
         let audioCtx = null;
         let isAudioInit = false;
+        let monsterGain = null;
 
         function initAudio() {
             if (audioCtx) return;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             document.getElementById('audio-btn').style.background = '#2e8b57';
+            document.getElementById('audio-btn').innerText = '🔊 Audio Listo';
             isAudioInit = true;
 
+            // Zumbido constante de neón
             let humOsc = audioCtx.createOscillator();
             let humGain = audioCtx.createGain();
-            humOsc.type = 'sawtooth';
-            humOsc.frequency.setValueAtTime(55, audioCtx.currentTime);
+            humOsc.type = 'sawtooth'; humOsc.frequency.setValueAtTime(55, audioCtx.currentTime);
             humGain.gain.setValueAtTime(0.012, audioCtx.currentTime);
-            humOsc.connect(humGain);
-            humGain.connect(audioCtx.destination);
+            humOsc.connect(humGain); humGain.connect(audioCtx.destination);
             humOsc.start();
+
+            // Sonido del Monstruo (Saturado y grave)
+            let mOsc = audioCtx.createOscillator();
+            monsterGain = audioCtx.createGain();
+            mOsc.type = 'square'; mOsc.frequency.setValueAtTime(30, audioCtx.currentTime);
+            monsterGain.gain.setValueAtTime(0.0, audioCtx.currentTime); // Empieza mudo
+            mOsc.connect(monsterGain); monsterGain.connect(audioCtx.destination);
+            mOsc.start();
         }
 
         function playStepSound() {
             if (!isAudioInit || !audioCtx) return;
-            try {
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(player.inTunnel ? 40 : 60, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
-            } catch(e) {}
+            let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(player.inTunnel ? 40 : 60, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
         }
 
         // Bindeo de botones
@@ -165,206 +167,188 @@
             const el = document.getElementById(id);
             const start = (e) => { e.preventDefault(); keys[key] = true; initAudio(); };
             const stop = (e) => { e.preventDefault(); keys[key] = false; };
-            el.addEventListener('touchstart', start);
-            el.addEventListener('touchend', stop);
-            el.addEventListener('mousedown', start);
-            el.addEventListener('mouseup', stop);
+            el.addEventListener('touchstart', start); el.addEventListener('touchend', stop);
+            el.addEventListener('mousedown', start); el.addEventListener('mouseup', stop);
         }
-
-        bindBtn('btn-fwd', 'fwd');
-        bindBtn('btn-back', 'back');
-        bindBtn('btn-left', 'left');
-        bindBtn('btn-right', 'right');
+        bindBtn('btn-fwd', 'fwd'); bindBtn('btn-back', 'back');
+        bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right');
 
         // Botón Agacharse
-        const btnCrouch = document.getElementById('btn-crouch');
-        btnCrouch.addEventListener('touchstart', (e) => { e.preventDefault(); player.crouched = !player.crouched; });
-        btnCrouch.addEventListener('mousedown', () => { player.crouched = !player.crouched; });
+        document.getElementById('btn-crouch').addEventListener('touchstart', (e) => { e.preventDefault(); player.crouched = !player.crouched; initAudio(); });
+        document.getElementById('btn-crouch').addEventListener('mousedown', () => { player.crouched = !player.crouched; initAudio(); });
 
         // Bucle de Juego
         let stepTimer = 0;
         function update() {
-            let moveSpeed = player.crouched ? 0.02 : 0.038;
+            let moveSpeed = player.crouched ? 0.022 : 0.04;
             let rotSpeed = 0.045;
 
             if (keys.left) player.angle -= rotSpeed;
             if (keys.right) player.angle += rotSpeed;
 
             let dx = 0, dy = 0;
-            if (keys.fwd) {
-                dx += Math.cos(player.angle) * moveSpeed;
-                dy += Math.sin(player.angle) * moveSpeed;
-            }
-            if (keys.back) {
-                dx -= Math.cos(player.angle) * moveSpeed;
-                dy -= Math.sin(player.angle) * moveSpeed;
-            }
+            if (keys.fwd) { dx += Math.cos(player.angle) * moveSpeed; dy += Math.sin(player.angle) * moveSpeed; }
+            if (keys.back) { dx -= Math.cos(player.angle) * moveSpeed; dy -= Math.sin(player.angle) * moveSpeed; }
 
             let margin = 0.2;
-            let checkX = Math.floor(player.x + dx + Math.sign(dx)*margin);
-            let checkY = Math.floor(player.y + dy + Math.sign(dy)*margin);
+            if (mainMap[Math.floor(player.y)][Math.floor(player.x + dx + Math.sign(dx)*margin)] !== 1) player.x += dx;
+            if (mainMap[Math.floor(player.y + dy + Math.sign(dy)*margin)][Math.floor(player.x)] !== 1) player.y += dy;
 
-            if (mainMap[Math.floor(player.y)][checkX] !== 1) player.x += dx;
-            if (mainMap[checkY][Math.floor(player.x)] !== 1) player.y += dy;
-
-            // Transición por Escaleras (Celda tipo 2)
-            let currentCell = mainMap[Math.floor(player.y)][Math.floor(player.x)];
-            if (currentCell === 2 && !player.stairLock) {
-                player.inTunnel = !player.inTunnel;
-                player.stairLock = true;
-                document.getElementById('warning').innerHTML = player.inTunnel ? 
-                    '⚠ TÚNELES SUBTERRÁNEOS<br>Techo extremadamente bajo.' : 
-                    '⚠ NIVEL 0: PASILLOS<br>Busca escaleras para bajar.';
-                setTimeout(() => player.stairLock = false, 1500);
-            }
-
-            if (keys.fwd || keys.back) {
-                player.bobbing += player.crouched ? 0.08 : 0.15;
-                stepTimer++;
-                if (stepTimer % 20 === 0) playStepSound();
-            } else {
-                player.bobbing = 0;
-            }
-
-            // IA Monstruo
-            if (monster.active) {
-                let mdx = player.x - monster.x;
-                let mdy = player.y - monster.y;
+            // IA y Sonido del Monstruo
+            if (monster.active && isAudioInit) {
+                let mdx = player.x - monster.x; let mdy = player.y - monster.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
 
-                if (dist < 8) {
-                    monster.x += (mdx / dist) * monster.speed;
-                    monster.y += (mdy / dist) * monster.speed;
+                if (dist < 10) { // Persigue si está cerca
+                    monster.x += (mdx / dist) * monster.speed; monster.y += (mdy / dist) * monster.speed;
                 }
 
-                if (dist < 0.4 && !player.crouched) {
-                    alert('¡TE ATRAPÓ LA ENTIDAD!');
+                // Volumen del sonido del monstruo según distancia
+                let mVolume = Math.max(0, 1 - (dist / 8));
+                monsterGain.gain.setValueAtTime(mVolume * 0.15, audioCtx.currentTime);
+
+                // Efecto de Oscuridad en pantalla por miedo
+                if (dist < 4) {
+                    let darkValue = 1 - (dist / 4);
+                    canvas.style.filter = `contrast(${1 + darkValue}) brightness(${1 - darkValue * 0.7}) blur(${darkValue * 3}px)`;
+                } else {
+                    canvas.style.filter = 'contrast(1.1) brightness(0.9) blur(0px)';
+                }
+
+                if (dist < 0.35 && !player.crouched) {
+                    alert('¡TE ENCONTRÓ LA ENTIDAD!');
                     player.x = 1.5; player.y = 1.5; monster.x = 13.5; monster.y = 13.5;
                 }
             }
+
+            if (keys.fwd || keys.back) {
+                player.bobbing += player.crouched ? 0.08 : 0.15; stepTimer++;
+                if (stepTimer % 16 === 0) playStepSound();
+            } else { player.bobbing = 0; }
+        }
+
+        // Funciones de dibujo de Objetos Reales
+        function drawChair(screenX, pTop, propSize, distShadow) {
+            ctx.fillStyle = `rgb(${90 * distShadow}, ${60 * distShadow}, ${40 * distShadow})`;
+            // Respaldo
+            ctx.fillRect(screenX - propSize/2, pTop, propSize, propSize/10);
+            // Asiento
+            ctx.fillRect(screenX - propSize/2, pTop + propSize/2, propSize, propSize/10);
+            // Patas
+            ctx.fillRect(screenX - propSize/2, pTop + propSize/2, propSize/8, propSize/2);
+            ctx.fillRect(screenX + propSize/2 - propSize/8, pTop + propSize/2, propSize/8, propSize/2);
+            ctx.fillRect(screenX - propSize/8, pTop + propSize/2, propSize/8, propSize/2);
+        }
+
+        function drawVase(screenX, pTop, propSize, distShadow) {
+            ctx.fillStyle = `rgb(${210 * distShadow}, ${100 * distShadow}, ${50 * distShadow})`; // Terracota
+            ctx.beginPath();
+            // Cuerpo
+            ctx.ellipse(screenX, pTop + propSize/2, propSize/2, propSize/1.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Cuello
+            ctx.fillRect(screenX - propSize/6, pTop, propSize/3, propSize/2);
+        }
+
+        function drawLamp(screenX, pTop, propSize, distShadow) {
+            // Pantalla
+            ctx.fillStyle = `rgb(${200 * distShadow}, ${190 * distShadow}, ${100 * distShadow})`;
+            ctx.beginPath();
+            ctx.moveTo(screenX - propSize/2, pTop + propSize/2); ctx.lineTo(screenX + propSize/2, pTop + propSize/2);
+            ctx.lineTo(screenX + propSize/3, pTop); ctx.lineTo(screenX - propSize/3, pTop);
+            ctx.fill();
+            // Base
+            ctx.fillStyle = `rgb(${80 * distShadow}, ${80 * distShadow}, ${80 * distShadow})`;
+            ctx.fillRect(screenX - propSize/12, pTop + propSize/2, propSize/6, propSize);
         }
 
         // Renderizado
         function render() {
             let crouchOffset = player.crouched ? canvas.height / 5 : 0;
-            let tunnelDim = player.inTunnel ? 0.5 : 1.0;
+            ctx.fillStyle = '#0a0a05'; ctx.fillRect(0, 0, canvas.width, canvas.height / 2 + crouchOffset); // Techo
+            ctx.fillStyle = '#211d0a'; ctx.fillRect(0, canvas.height / 2 + crouchOffset, canvas.width, canvas.height / 2 - crouchOffset); // Suelo
 
-            // Techo
-            ctx.fillStyle = player.inTunnel ? '#050505' : '#0d0c05';
-            ctx.fillRect(0, 0, canvas.width, canvas.height / 2 + crouchOffset);
-
-            // Suelo
-            ctx.fillStyle = player.inTunnel ? '#11100d' : '#211d0a';
-            ctx.fillRect(0, canvas.height / 2 + crouchOffset, canvas.width, canvas.height / 2 - crouchOffset);
-
-            const fov = Math.PI / 3.2;
-            const numRays = Math.floor(canvas.width / 3);
-            const rayWidth = canvas.width / numRays;
-            const bobOffset = Math.sin(player.bobbing) * (player.crouched ? 4 : 8);
+            const fov = Math.PI / 3.2; const numRays = Math.floor(canvas.width / 3);
+            const rayWidth = canvas.width / numRays; const bobOffset = Math.sin(player.bobbing) * (player.crouched ? 4 : 8);
 
             let zBuffer = [];
-
             for (let i = 0; i < numRays; i++) {
                 let rayAngle = (player.angle - fov / 2) + (i / numRays) * fov;
-                let distance = 0;
-                let hit = 0;
+                let distance = 0; let hit = 0;
+                let cos = Math.cos(rayAngle); let sin = Math.sin(rayAngle);
 
-                let cos = Math.cos(rayAngle);
-                let sin = Math.sin(rayAngle);
-
-                while (!hit && distance < 8) {
+                while (!hit && distance < 8.5) {
                     distance += 0.035;
-                    let checkX = Math.floor(player.x + cos * distance);
-                    let checkY = Math.floor(player.y + sin * distance);
-
-                    if (checkX < 0 || checkX >= MAP_SIZE || checkY < 0 || checkY >= MAP_SIZE) {
-                        hit = 1;
-                    } else if (mainMap[checkY][checkX] > 0) {
-                        hit = mainMap[checkY][checkX];
-                    }
+                    let checkX = Math.floor(player.x + cos * distance); let checkY = Math.floor(player.y + sin * distance);
+                    if (checkX < 0 || checkX >= MAP_SIZE || checkY < 0 || checkY >= MAP_SIZE || mainMap[checkY][checkX] > 0) hit = 1;
                 }
-
                 zBuffer[i] = distance;
-
                 let correctedDist = distance * Math.cos(rayAngle - player.angle);
-                let wallHeight = (canvas.height / (correctedDist + 0.05)) * (player.inTunnel ? 0.7 : 1.0);
-
-                let shadow = Math.max(0, 1 - (correctedDist / 6)) * tunnelDim;
-
-                let r = Math.floor((hit === 2 ? 100 : 180) * shadow);
-                let g = Math.floor((hit === 2 ? 100 : 150) * shadow);
-                let b = Math.floor((hit === 2 ? 250 : 35) * shadow);
-
-                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                let wallHeight = (canvas.height / (correctedDist + 0.05));
+                let shadow = Math.max(0, 1 - (correctedDist / 7));
+                ctx.fillStyle = `rgb(${190 * shadow}, ${165 * shadow}, ${45 * shadow})`;
                 let wallTop = (canvas.height - wallHeight) / 2 + bobOffset + crouchOffset;
                 ctx.fillRect(i * rayWidth, wallTop, rayWidth + 1, wallHeight);
             }
 
-            // Renderizado de Objetos Cotidianos (Sprites)
+            // Renderizado de Objetos (Sprites Reales)
             props.forEach(prop => {
-                let pdx = prop.x - player.x;
-                let pdy = prop.y - player.y;
-
+                let pdx = prop.x - player.x; let pdy = prop.y - player.y;
                 let pAngle = Math.atan2(pdy, pdx) - player.angle;
-                while (pAngle < -Math.PI) pAngle += Math.PI * 2;
-                while (pAngle > Math.PI) pAngle -= Math.PI * 2;
-
+                while (pAngle < -Math.PI) pAngle += Math.PI * 2; while (pAngle > Math.PI) pAngle -= Math.PI * 2;
                 let dist = Math.sqrt(pdx * pdx + pdy * pdy);
 
-                if (dist > 0.3 && dist < 6 && Math.abs(pAngle) < fov) {
+                if (dist > 0.3 && dist < 6.5 && Math.abs(pAngle) < fov) {
                     let screenX = (canvas.width / 2) + Math.tan(pAngle) * (canvas.width / 2);
-                    let propSize = (canvas.height / dist) * 0.4;
-
+                    let propSize = (canvas.height / dist) * 0.45;
                     let rayIdx = Math.floor(screenX / rayWidth);
-                    if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
-                        let pTop = (canvas.height / 2) + crouchOffset + bobOffset + (propSize * 0.2);
 
-                        ctx.fillStyle = prop.type === 0 ? '#5a3d28' : (prop.type === 1 ? '#8b5a2b' : '#aaaaaa');
-                        ctx.fillRect(screenX - propSize/2, pTop, propSize, propSize);
+                    if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
+                        let pTop = (canvas.height / 2) + crouchOffset + bobOffset + (propSize * 0.1);
+                        let distShadow = Math.max(0, 1 - (dist / 6));
+
+                        if (prop.type === 0) drawChair(screenX, pTop, propSize, distShadow);
+                        else if (prop.type === 1) drawVase(screenX, pTop, propSize, distShadow);
+                        else drawLamp(screenX, pTop, propSize, distShadow);
                     }
                 }
             });
 
-            // Renderizado de la Entidad
-            if (monster.active && !player.inTunnel) {
-                let mdx = monster.x - player.x;
-                let mdy = monster.y - player.y;
-
+            // Renderizado de la Entidad Visble
+            if (monster.active && isAudioInit) {
+                let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let mAngle = Math.atan2(mdy, mdx) - player.angle;
-                while (mAngle < -Math.PI) mAngle += Math.PI * 2;
-                while (mAngle > Math.PI) mAngle -= Math.PI * 2;
-
+                while (mAngle < -Math.PI) mAngle += Math.PI * 2; while (mAngle > Math.PI) mAngle -= Math.PI * 2;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
 
-                if (dist > 0.2 && dist < 7 && Math.abs(mAngle) < fov) {
+                if (dist > 0.1 && dist < 7.5 && Math.abs(mAngle) < fov) {
                     let screenX = (canvas.width / 2) + Math.tan(mAngle) * (canvas.width / 2);
-                    let mSize = Math.min(canvas.height, (canvas.height / dist));
-
+                    let mSize = Math.min(canvas.height, (canvas.height / dist)) * 0.9;
                     let rayIdx = Math.floor(screenX / rayWidth);
+
                     if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
                         let mTop = (canvas.height - mSize) / 2 + bobOffset + crouchOffset;
+                        let distShadow = Math.max(0, 1 - (dist / 7));
 
-                        ctx.fillStyle = '#050505';
+                        // Silueta Oscura de cables/sombra
+                        ctx.fillStyle = `rgba(5, 5, 5, ${distShadow * 1.5})`;
                         ctx.beginPath();
                         ctx.ellipse(screenX, mTop + mSize/2, mSize/4, mSize/2, 0, 0, Math.PI * 2);
                         ctx.fill();
 
-                        ctx.fillStyle = '#ff1111';
-                        ctx.fillRect(screenX - mSize/12, mTop + mSize/3, mSize/15, mSize/15);
-                        ctx.fillRect(screenX + mSize/25, mTop + mSize/3, mSize/15, mSize/15);
+                        // Ojos brillantes fijos
+                        ctx.fillStyle = `rgb(255, 17, 17)`;
+                        ctx.fillRect(screenX - mSize/10, mTop + mSize/3, mSize/12, mSize/12);
+                        ctx.fillRect(screenX + mSize/25, mTop + mSize/3, mSize/12, mSize/12);
                     }
                 }
             }
         }
 
-        function gameLoop() {
-            update();
-            render();
-            requestAnimationFrame(gameLoop);
-        }
-
+        function gameLoop() { update(); render(); requestAnimationFrame(gameLoop); }
         gameLoop();
     </script>
 </body>
 </html>
+
 
