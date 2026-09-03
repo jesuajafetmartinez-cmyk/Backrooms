@@ -3,77 +3,106 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>The Backrooms Mobile</title>
+  <title>The Backrooms: Horrores de la Liminalidad</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; touch-action: none; }
-    body, html { width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: sans-serif; }
-    #canvas { width: 100vw; height: 100vh; display: block; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; }
+    #canvas { width: 100vw; height: 100vh; display: block; filter: contrast(1.1) brightness(0.9); }
     
-    /* Controles Táctiles */
-    #touch-zone-left { position: absolute; top: 0; left: 0; width: 50vw; height: 100vh; z-index: 10; }
-    #touch-zone-right { position: absolute; top: 0; right: 0; width: 50vw; height: 100vh; z-index: 10; }
+    /* Zonas Táctiles */
+    #zone-left { position: absolute; top: 0; left: 0; width: 50vw; height: 100vh; z-index: 10; }
+    #zone-right { position: absolute; top: 0; right: 0; width: 50vw; height: 100vh; z-index: 10; }
     
-    #joystick-base {
-      position: absolute; bottom: 40px; left: 40px; width: 100px; height: 100px;
-      background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255, 255, 255, 0.3);
+    /* Joystick */
+    #joy-base {
+      position: absolute; width: 100px; height: 100px;
+      background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.2);
       border-radius: 50%; display: none; z-index: 20; pointer-events: none;
     }
-    #joystick-stick {
-      position: absolute; width: 40px; height: 40px; background: rgba(255, 255, 0, 0.6);
+    #joy-stick {
+      position: absolute; width: 40px; height: 40px; background: rgba(200, 0, 0, 0.5);
       border-radius: 50%; top: 30px; left: 30px; pointer-events: none;
     }
     
-    #ui {
-      position: absolute; top: 15px; left: 15px; color: #ffffa0;
-      font-size: 14px; text-shadow: 1px 1px 2px #000; z-index: 5; pointer-events: none;
+    /* UI Estilo Cámara VHS */
+    #vhs-ui {
+      position: absolute; top: 20px; left: 20px; color: #0f0;
+      font-size: 16px; text-shadow: 0 0 5px #0f0; z-index: 5; pointer-events: none;
     }
+    #vhs-rec {
+      position: absolute; top: 20px; right: 20px; color: #f00;
+      font-size: 18px; font-weight: bold; animation: blink 1s infinite; z-index: 5; pointer-events: none;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* Pantalla Game Over */
     #game-over {
       position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0,0,0,0.9); color: red; display: flex; flex-direction: column;
+      background: #000; color: #f00; display: flex; flex-direction: column;
       justify-content: center; align-items: center; z-index: 30; display: none;
     }
+    #game-over h1 { font-size: 32px; letter-spacing: 4px; text-shadow: 0 0 10px #f00; }
     #game-over button {
-      margin-top: 20px; padding: 12px 24px; font-size: 18px; background: #ffffa0;
-      border: none; border-radius: 4px; font-weight: bold; cursor: pointer;
+      margin-top: 30px; padding: 12px 30px; font-size: 16px; background: #300;
+      color: #f00; border: 1px solid #f00; cursor: pointer; font-family: monospace;
     }
   </style>
 </head>
 <body>
 
-  <div id="ui">Nivel 0: El Laberinto Monótono</div>
+  <div id="vhs-ui">CAM 01 - NIVEL 0<br><span id="timer">00:00:00</span></div>
+  <div id="vhs-rec">● REC</div>
   <canvas id="canvas"></canvas>
 
-  <div id="touch-zone-left"></div>
-  <div id="touch-zone-right"></div>
-  
-  <div id="joystick-base"><div id="joystick-stick"></div></div>
+  <div id="zone-left"></div>
+  <div id="zone-right"></div>
+  <div id="joy-base"><div id="joy-stick"></div></div>
 
   <div id="game-over">
-    <h1>¡EL SMILER TE ATRAPÓ!</h1>
-    <p style="color: #aaa; margin-top: 10px;">Sucumbiste a los Backrooms...</p>
-    <button onclick="restartGame()">REINTENTAR</button>
+    <h1>NO ESTÁS SOLO</h1>
+    <p style="color: #666; margin-top: 10px;">Tu presencia fue consumida.</p>
+    <button onclick="restart()">REINTENTAR</button>
   </div>
 
   <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
 
-    // Ajuste de pantalla
+    // Resolución interna baja para rendimiento fluido y estética retro
     function resize() {
-      canvas.width = window.innerWidth / 2; // Menor resolución para rendimiento y estética retro
-      canvas.height = window.innerHeight / 2;
+      canvas.width = Math.floor(window.innerWidth / 2.5);
+      canvas.height = Math.floor(window.innerHeight / 2.5);
     }
     resize();
     window.addEventListener('resize', resize);
 
-    // Mapa del Laberinto (1 = Pared, 0 = Vacío)
+    // --- GENERADOR DE TEXTURAS EN CANVAS ---
+    const texSize = 64;
+    
+    // Textura Pared (Papel tapiz desgastado)
+    const wallTex = document.createElement('canvas');
+    wallTex.width = wallTex.height = texSize;
+    const wCtx = wallTex.getContext('2d');
+    wCtx.fillStyle = '#bfa852'; wCtx.fillRect(0,0,texSize,texSize);
+    wCtx.fillStyle = '#9e893c';
+    for(let i=0; i<texSize; i+=8) {
+      wCtx.fillRect(i, 0, 2, texSize);
+      wCtx.fillRect(0, i, texSize, 2);
+    }
+    // Manchas/Suciedad
+    wCtx.fillStyle = 'rgba(50,40,10,0.15)';
+    for(let i=0; i<30; i++) {
+      wCtx.fillRect(Math.random()*texSize, Math.random()*texSize, Math.random()*8, Math.random()*8);
+    }
+
+    // Mapa (1: Pared, 0: Pasillo)
     const mapSize = 16;
     const map = [
       1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
       1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1,
       1,0,1,0,1,0,1,1,1,1,0,1,0,1,0,1,
       1,0,1,0,0,0,0,0,0,1,0,0,0,1,0,1,
-      1,0,1,1,1,1,0,1,0,1,1,1,1,1,0,1,
+      1,0,1,1,1,1,0,1,0,1,1,1,0,1,0,1,
       1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,
       1,1,1,1,0,1,0,1,1,1,1,0,1,1,1,1,
       1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,
@@ -88,89 +117,53 @@
     ];
 
     // Jugador
-    let player = {
-      x: 2.5,
-      y: 2.5,
-      dirX: 1,
-      dirY: 0,
-      planeX: 0,
-      planeY: 0.66,
-      moveSpeed: 0.03,
-      rotSpeed: 0.003
-    };
+    let player = { x: 2.5, y: 2.5, dirX: 1, dirY: 0, planeX: 0, planeY: 0.66, moveSpeed: 0.035, rotSpeed: 0.003 };
 
-    // Entidad (Smiler)
-    let entity = {
-      x: 13.5,
-      y: 13.5,
-      speed: 0.015,
-      active: true
-    };
+    // Entidad
+    let entity = { x: 13.5, y: 13.5, speed: 0.02, active: true };
 
-    // Controles Táctiles
-    let joyActive = false;
-    let joyStart = { x: 0, y: 0 };
-    let joyMove = { x: 0, y: 0 };
-    let rightTouchId = null;
-    let lastRightX = 0;
+    // Controles
+    let joyActive = false, joyStart = {x:0, y:0}, joyMove = {x:0, y:0};
+    let rightTouchId = null, lastRightX = 0;
 
-    const joyBaseEl = document.getElementById('joystick-base');
-    const joyStickEl = document.getElementById('joystick-stick');
-    const zoneLeft = document.getElementById('touch-zone-left');
-    const zoneRight = document.getElementById('touch-zone-right');
+    const joyBase = document.getElementById('joy-base');
+    const joyStick = document.getElementById('joy-stick');
 
-    zoneLeft.addEventListener('touchstart', e => {
-      const t = e.changedTouches[0];
-      joyActive = true;
-      joyStart = { x: t.clientX, y: t.clientY };
-      joyMove = { x: 0, y: 0 };
-      joyBaseEl.style.display = 'block';
-      joyBaseEl.style.left = (t.clientX - 50) + 'px';
-      joyBaseEl.style.top = (t.clientY - 50) + 'px';
-      joyStickEl.style.transform = `translate(0px, 0px)`;
+    document.getElementById('zone-left').addEventListener('touchstart', e => {
+      let t = e.changedTouches[0];
+      joyActive = true; joyStart = { x: t.clientX, y: t.clientY }; joyMove = { x: 0, y: 0 };
+      joyBase.style.display = 'block'; joyBase.style.left = (t.clientX - 50)+'px'; joyBase.style.top = (t.clientY - 50)+'px';
     });
 
-    zoneLeft.addEventListener('touchmove', e => {
-      if (!joyActive) return;
-      const t = e.changedTouches[0];
-      let dx = t.clientX - joyStart.x;
-      let dy = t.clientY - joyStart.y;
-      const dist = Math.hypot(dx, dy);
-      const maxDist = 40;
-      if (dist > maxDist) {
-        dx = (dx / dist) * maxDist;
-        dy = (dy / dist) * maxDist;
-      }
-      joyMove = { x: dx / maxDist, y: dy / maxDist };
-      joyStickEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    document.getElementById('zone-left').addEventListener('touchmove', e => {
+      if(!joyActive) return;
+      let t = e.changedTouches[0];
+      let dx = t.clientX - joyStart.x, dy = t.clientY - joyStart.y;
+      let dist = Math.hypot(dx, dy), maxD = 40;
+      if(dist > maxD) { dx = (dx/dist)*maxD; dy = (dy/dist)*maxD; }
+      joyMove = { x: dx/maxD, y: dy/maxD };
+      joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
     });
 
-    const endJoy = () => {
-      joyActive = false;
-      joyMove = { x: 0, y: 0 };
-      joyBaseEl.style.display = 'none';
-    };
-    zoneLeft.addEventListener('touchend', endJoy);
-    zoneLeft.addEventListener('touchcancel', endJoy);
+    const endJoy = () => { joyActive = false; joyMove = {x:0, y:0}; joyBase.style.display = 'none'; };
+    document.getElementById('zone-left').addEventListener('touchend', endJoy);
 
-    // Rotación de cámara (Zona Derecha)
-    zoneRight.addEventListener('touchstart', e => {
-      const t = e.changedTouches[0];
-      rightTouchId = t.identifier;
-      lastRightX = t.clientX;
+    document.getElementById('zone-right').addEventListener('touchstart', e => {
+      let t = e.changedTouches[0];
+      rightTouchId = t.identifier; lastRightX = t.clientX;
     });
 
-    zoneRight.addEventListener('touchmove', e => {
-      for (let t of e.changedTouches) {
-        if (t.identifier === rightTouchId) {
+    document.getElementById('zone-right').addEventListener('touchmove', e => {
+      for(let t of e.changedTouches) {
+        if(t.identifier === rightTouchId) {
           let dx = t.clientX - lastRightX;
-          rotatePlayer(dx * player.rotSpeed);
+          rotate(dx * player.rotSpeed);
           lastRightX = t.clientX;
         }
       }
     });
 
-    function rotatePlayer(angle) {
+    function rotate(angle) {
       let oldDirX = player.dirX;
       player.dirX = player.dirX * Math.cos(angle) - player.dirY * Math.sin(angle);
       player.dirY = oldDirX * Math.sin(angle) + player.dirY * Math.cos(angle);
@@ -179,82 +172,64 @@
       player.planeY = oldPlaneX * Math.sin(angle) + player.planeY * Math.cos(angle);
     }
 
-    // Lógica del juego
+    // Actualización
     function update() {
-      // Movimiento por Joystick
-      if (joyActive) {
+      if(joyActive) {
         let fwd = -joyMove.y * player.moveSpeed;
         let side = joyMove.x * player.moveSpeed;
-
-        // Movimiento Frontal/Trasero
-        let newX = player.x + player.dirX * fwd;
-        let newY = player.y + player.dirY * fwd;
-        if (map[Math.floor(player.y) * mapSize + Math.floor(newX)] === 0) player.x = newX;
-        if (map[Math.floor(newY) * mapSize + Math.floor(player.x)] === 0) player.y = newY;
-
-        // Movimiento Lateral (Strafe)
-        let strafeX = player.planeX * side;
-        let strafeY = player.planeY * side;
-        if (map[Math.floor(player.y) * mapSize + Math.floor(player.x + strafeX)] === 0) player.x += strafeX;
-        if (map[Math.floor(player.y + strafeY) * mapSize + Math.floor(player.x)] === 0) player.y += strafeY;
+        
+        let nx = player.x + player.dirX * fwd + player.planeX * side;
+        let ny = player.y + player.dirY * fwd + player.planeY * side;
+        
+        if(map[Math.floor(player.y)*mapSize + Math.floor(nx)] === 0) player.x = nx;
+        if(map[Math.floor(ny)*mapSize + Math.floor(player.x)] === 0) player.y = ny;
       }
 
-      // IA de la entidad (sigue al jugador)
-      if (entity.active) {
-        let edx = player.x - entity.x;
-        let edy = player.y - entity.y;
+      // IA Entidad
+      if(entity.active) {
+        let edx = player.x - entity.x, edy = player.y - entity.y;
         let dist = Math.hypot(edx, edy);
-
-        if (dist < 0.5) {
+        if(dist < 0.4) {
           document.getElementById('game-over').style.display = 'flex';
           entity.active = false;
         } else {
-          entity.x += (edx / dist) * entity.speed;
-          entity.y += (edy / dist) * entity.speed;
+          entity.x += (edx/dist) * entity.speed;
+          entity.y += (edy/dist) * entity.speed;
         }
       }
     }
 
-    // Motor de Renderizado Raycasting
+    // Renderizado Raycasting
     function render() {
-      const w = canvas.width;
-      const h = canvas.height;
-      
-      // Renderizar Techo y Suelo con parpadeo suave
-      let flicker = Math.random() > 0.98 ? 0.6 : 1.0;
-      ctx.fillStyle = `rgb(${100 * flicker}, ${95 * flicker}, ${50 * flicker})`; // Techo sucio
-      ctx.fillRect(0, 0, w, h / 2);
-      ctx.fillStyle = `rgb(${60 * flicker}, ${55 * flicker}, ${30 * flicker})`; // Alfombra húmeda
-      ctx.fillRect(0, h / 2, w, h / 2);
+      const w = canvas.width, h = canvas.height;
+      let flicker = Math.random() > 0.96 ? 0.4 : 1.0;
+
+      // Techo y Suelo
+      ctx.fillStyle = `rgb(${20*flicker}, ${20*flicker}, ${10*flicker})`; ctx.fillRect(0, 0, w, h/2);
+      ctx.fillStyle = `rgb(${40*flicker}, ${35*flicker}, ${15*flicker})`; ctx.fillRect(0, h/2, w, h/2);
 
       let zBuffer = [];
 
-      // Renderizar Paredes
-      for (let x = 0; x < w; x++) {
+      // Render Paredes con Textura
+      for(let x = 0; x < w; x++) {
         let cameraX = 2 * x / w - 1;
         let rayDirX = player.dirX + player.planeX * cameraX;
         let rayDirY = player.dirY + player.planeY * cameraX;
 
-        let mapX = Math.floor(player.x);
-        let mapY = Math.floor(player.y);
+        let mapX = Math.floor(player.x), mapY = Math.floor(player.y);
+        let deltaDistX = Math.abs(1 / rayDirX), deltaDistY = Math.abs(1 / rayDirY);
+        let stepX, stepY, sideDistX, sideDistY;
 
-        let deltaDistX = Math.abs(1 / rayDirX);
-        let deltaDistY = Math.abs(1 / rayDirY);
-
-        let stepX, stepY;
-        let sideDistX, sideDistY;
-
-        if (rayDirX < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
+        if(rayDirX < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
         else { stepX = 1; sideDistX = (mapX + 1.0 - player.x) * deltaDistX; }
-        if (rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
+        if(rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
         else { stepY = 1; sideDistY = (mapY + 1.0 - player.y) * deltaDistY; }
 
-        let hit = 0;
-        let side = 0;
-        while (hit === 0) {
-          if (sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
+        let hit = 0, side = 0;
+        while(hit === 0) {
+          if(sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
           else { sideDistY += deltaDistY; mapY += stepY; side = 1; }
-          if (map[mapY * mapSize + mapX] > 0) hit = 1;
+          if(map[mapY * mapSize + mapX] > 0) hit = 1;
         }
 
         let perpWallDist = (side === 0) ? (mapX - player.x + (1 - stepX) / 2) / rayDirX : (mapY - player.y + (1 - stepY) / 2) / rayDirY;
@@ -262,62 +237,78 @@
 
         let lineHeight = Math.floor(h / perpWallDist);
         let drawStart = -lineHeight / 2 + h / 2;
-        let drawEnd = lineHeight / 2 + h / 2;
 
-        // Sombra de pared por distancia y tipo de cara
-        let shade = Math.min(1, 3 / perpWallDist) * flicker;
-        let color = side === 1 ? `rgb(${180 * shade}, ${170 * shade}, ${80 * shade})` : `rgb(${210 * shade}, ${195 * shade}, ${90 * shade})`;
+        // Cálculo de textura x
+        let wallX;
+        if(side === 0) wallX = player.y + perpWallDist * rayDirY;
+        else wallX = player.x + perpWallDist * rayDirX;
+        wallX -= Math.floor(wallX);
+        let texX = Math.floor(wallX * texSize);
 
-        ctx.fillStyle = color;
-        ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+        // Renderizar columna de textura
+        ctx.drawImage(wallTex, texX, 0, 1, texSize, x, drawStart, 1, lineHeight);
+
+        // Sombra de Oscuridad / Niebla
+        let shadow = Math.min(1, perpWallDist / 4);
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadow})`;
+        ctx.fillRect(x, drawStart, 1, lineHeight);
       }
 
-      // Renderizar Entidad (Smiler)
-      if (entity.active) {
-        let spriteX = entity.x - player.x;
-        let spriteY = entity.y - player.y;
-
+      // Render Entidad (Terror)
+      if(entity.active) {
+        let sx = entity.x - player.x, sy = entity.y - player.y;
         let invDet = 1.0 / (player.planeX * player.dirY - player.dirX * player.planeY);
-        let transformX = invDet * (player.dirY * spriteX - player.dirX * spriteY);
-        let transformY = invDet * (-player.planeY * spriteX + player.planeX * spriteY);
+        let transformX = invDet * (player.dirY * sx - player.dirX * sy);
+        let transformY = invDet * (-player.planeY * sx + player.planeX * sy);
 
-        if (transformY > 0) {
-          let spriteScreenX = Math.floor((w / 2) * (1 + transformX / transformY));
-          let spriteHeight = Math.abs(Math.floor(h / transformY));
-          let drawStartY = -spriteHeight / 2 + h / 2;
-          let spriteWidth = spriteHeight;
-          let drawStartX = Math.floor(-spriteWidth / 2 + spriteScreenX);
+        if(transformY > 0) {
+          let screenX = Math.floor((w / 2) * (1 + transformX / transformY));
+          let eHeight = Math.abs(Math.floor(h / transformY));
+          let eWidth = eHeight;
 
-          if (drawStartX >= 0 && drawStartX < w && transformY < zBuffer[drawStartX]) {
-            // Cara del Smiler
-            ctx.fillStyle = '#000';
-            ctx.beginPath();
-            ctx.arc(spriteScreenX, h / 2, spriteHeight / 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#fff';
-            // Ojos
-            ctx.fillRect(spriteScreenX - spriteWidth/6, h/2 - spriteHeight/8, spriteWidth/8, spriteHeight/8);
-            ctx.fillRect(spriteScreenX + spriteWidth/16, h/2 - spriteHeight/8, spriteWidth/8, spriteHeight/8);
-            // Sonrisa
-            ctx.fillRect(spriteScreenX - spriteWidth/5, h/2 + spriteHeight/8, spriteWidth/2.5, spriteHeight/16);
+          if(screenX > 0 && screenX < w && transformY < zBuffer[screenX]) {
+            // Cuerpo Sombra
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(screenX - eWidth/2, h/2 - eHeight/2, eWidth, eHeight);
+            
+            // Ojos Rojos brillantes
+            ctx.fillStyle = '#f00';
+            ctx.shadowColor = '#f00'; ctx.shadowBlur = 10;
+            ctx.fillRect(screenX - eWidth/5, h/2 - eHeight/4, eWidth/8, eHeight/12);
+            ctx.fillRect(screenX + eWidth/10, h/2 - eHeight/4, eWidth/8, eHeight/12);
+            ctx.shadowBlur = 0;
           }
         }
       }
+
+      // Efecto Viñeta / Linterna
+      let grad = ctx.createRadialGradient(w/2, h/2, w/6, w/2, h/2, w/1.2);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,w,h);
+    }
+
+    // Contador de tiempo
+    let startTime = Date.now();
+    function updateTimer() {
+      let diff = Math.floor((Date.now() - startTime) / 1000);
+      let m = String(Math.floor(diff/60)).padStart(2,'0');
+      let s = String(diff%60).padStart(2,'0');
+      document.getElementById('timer').innerText = `00:${m}:${s}`;
     }
 
     function loop() {
       update();
       render();
+      updateTimer();
       requestAnimationFrame(loop);
     }
 
-    function restartGame() {
-      player.x = 2.5;
-      player.y = 2.5;
-      entity.x = 13.5;
-      entity.y = 13.5;
-      entity.active = true;
+    function restart() {
+      player.x = 2.5; player.y = 2.5;
+      entity.x = 13.5; entity.y = 13.5; entity.active = true;
+      startTime = Date.now();
       document.getElementById('game-over').style.display = 'none';
     }
 
@@ -325,3 +316,4 @@
   </script>
 </body>
 </html>
+
