@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Audio Cues Sequence</title>
+    <title>The Backrooms - Advanced Objects & Crosshair</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; touch-action: none; }
@@ -15,6 +15,19 @@
             background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%);
             transition: background 0.2s ease-out;
         }
+
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px; height: 16px;
+            pointer-events: none; z-index: 20;
+            display: none;
+        }
+        #crosshair::before, #crosshair::after {
+            content: ''; position: absolute; background: rgba(255, 255, 255, 0.8);
+        }
+        #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
+        #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
 
         #ui-header {
             position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
@@ -101,15 +114,16 @@
 <body>
 
     <div id="vignette"></div>
+    <div id="crosshair"></div>
 
     <div id="ui-header">
-        <div id="mission-tracker">OBJETIVO: Escucha las campanas para hallar la Llave 🔔</div>
+        <div id="mission-tracker">OBJETIVO: Sigue las campanas para hallar la Llave 🗝️</div>
         <div id="stealth-status">SENSACIÓN: Camina por los pasillos buscando la señal...</div>
     </div>
 
     <div id="start-screen">
         <h1 style="color: #c2b144; margin-bottom: 10px;">THE BACKROOMS</h1>
-        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">Usa auriculares. Los objetos clave emitirán campanadas cuando te acerques.</p>
+        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">Escucha atentamente. Guíate por el sonido para encontrar la llave, el cofre y las balas.</p>
         
         <div class="controls-selector">
             <label>MODO DE CÁMARA (ROTACIÓN):</label>
@@ -124,7 +138,7 @@
 
     <div id="win-screen" style="display: none;">
         <h1 style="color: #44c25d; margin-bottom: 10px;">¡HAS SOBREVIVIDO!</h1>
-        <p style="color: #aaa;">Lograste eliminar al jefe a tiempo.</p>
+        <p style="color: #aaa;">Derrotaste al jefe de 2 disparos.</p>
         <button class="btn-screen" onclick="location.reload()">JUGAR DE NUEVO</button>
     </div>
 
@@ -152,6 +166,7 @@
         const vignetteEl = document.getElementById('vignette');
         const trackerEl = document.getElementById('mission-tracker');
         const statusEl = document.getElementById('stealth-status');
+        const crosshairEl = document.getElementById('crosshair');
 
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         resize(); window.addEventListener('resize', resize);
@@ -177,7 +192,7 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
-        let monster = { x: 13.5, y: 13.5, speed: 0.032, active: false };
+        let monster = { x: 13.5, y: 13.5, speed: 0.045, active: false, hp: 2 };
         
         let keyItem = { x: 1.5, y: 14.5, collected: false };
         let chestItem = { x: 14.5, y: 1.5, opened: false };
@@ -252,18 +267,31 @@
 
         window.addEventListener('touchend', () => { touchStartX = null; });
 
+        function playPickupSound() {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+            osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+        }
+
         function playBellSound(proximityRatio) {
             if (!audioCtx) return;
             let osc = audioCtx.createOscillator();
             let gain = audioCtx.createGain();
             
-            // Frecuencia más alta según cercanía
             let freq = 800 + (1 - proximityRatio) * 600;
             osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
             
-            let vol = Math.min(0.3, (1 - proximityRatio) * 0.3);
+            let vol = Math.min(0.25, (1 - proximityRatio) * 0.25);
             gain.gain.setValueAtTime(vol, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
             
@@ -297,6 +325,19 @@
             osc.start(); osc.stop(audioCtx.currentTime + 0.3);
         }
 
+        function playMonsterHurtSound() {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(60, audioCtx.currentTime + 0.4);
+            gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        }
+
         function playScream() {
             if (!audioCtx) return;
             let osc = audioCtx.createOscillator();
@@ -322,6 +363,20 @@
                     overlay.style.display = 'none';
                     player.x = 1.5; player.y = 1.5;
                     monster.x = 13.5; monster.y = 13.5;
+                    monster.active = false;
+                    monster.hp = 2;
+                    hasGun = false;
+                    hasAmmo = false;
+                    keyItem.collected = false;
+                    chestItem.opened = false;
+                    ammoItem.collected = false;
+                    ammoItem.visible = false;
+                    crosshairEl.style.display = 'none';
+                    document.getElementById('btn-shoot').style.display = 'none';
+                    trackerEl.innerText = "OBJETIVO: Sigue las campanas para hallar la Llave 🗝️";
+                    statusEl.innerText = "SENSACIÓN: Te han atrapado... intenta de nuevo.";
+                    statusEl.style.borderColor = "#444";
+                    statusEl.style.color = "#888";
                     isDead = false;
                 }, 1000);
             } else {
@@ -342,9 +397,19 @@
             while (mAngle > Math.PI) mAngle -= Math.PI * 2;
 
             if (dist < 8 && Math.abs(mAngle) < 0.4) {
-                monster.active = false;
-                if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-                document.getElementById('win-screen').style.display = 'flex';
+                monster.hp--;
+                playMonsterHurtSound();
+
+                if (monster.hp <= 0) {
+                    monster.active = false;
+                    if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    document.getElementById('win-screen').style.display = 'flex';
+                } else {
+                    statusEl.innerText = "💥 ¡LE DISTE UN TIRO! Necesita 1 disparo más.";
+                    // Freno momentáneo al recibir impacto
+                    monster.x -= (mdx / dist) * 0.6;
+                    monster.y -= (mdy / dist) * 0.6;
+                }
             }
         }
 
@@ -361,7 +426,7 @@
         document.getElementById('btn-shoot').addEventListener('touchstart', (e) => { e.preventDefault(); shoot(); });
         document.getElementById('btn-shoot').addEventListener('mousedown', () => { shoot(); });
 
-        function canMoveTo(x, y, radius = 0.3) {
+        function canMoveTo(x, y, radius = 0.25) {
             let points = [
                 {x: x - radius, y: y - radius},
                 {x: x + radius, y: y - radius},
@@ -401,10 +466,11 @@
             if (canMoveTo(player.x + dx, player.y)) player.x += dx;
             if (canMoveTo(player.x, player.y + dy)) player.y += dy;
 
-            // --- SISTEMA DE PROXIMIDAD POR CAMPANAS ---
+            // Campanadas de proximidad
             let targetObj = null;
             if (!keyItem.collected) targetObj = keyItem;
             else if (!chestItem.opened) targetObj = chestItem;
+            else if (!ammoItem.collected) targetObj = ammoItem;
 
             if (targetObj) {
                 let tdx = targetObj.x - player.x; let tdy = targetObj.y - player.y;
@@ -412,39 +478,42 @@
                 let maxDist = 8.0;
 
                 if (targetDist < maxDist) {
-                    let ratio = targetDist / maxDist; // 0 muy cerca, 1 lejos
-                    let interval = 250 + (ratio * 1200); // Frecuencia de campanadas
+                    let ratio = targetDist / maxDist;
+                    let interval = 250 + (ratio * 1200);
 
                     if (Date.now() - lastBellTime > interval) {
                         playBellSound(ratio);
                         lastBellTime = Date.now();
                     }
 
-                    if (targetDist < 3.0) {
-                        statusEl.innerText = "🔔 PISTA: Escuchas una campana retumbando muy cerca...";
+                    if (targetDist < 3.0 && !monster.active) {
+                        statusEl.innerText = "🔔 PISTA: Escuchas la campana sonar muy cerca...";
                     }
                 }
             }
 
-            // 1. Recoger Llave (Invisible)
+            // 1. Recoger Llave
             if (!keyItem.collected) {
                 let kdx = keyItem.x - player.x; let kdy = keyItem.y - player.y;
                 if (Math.sqrt(kdx*kdx + kdy*kdy) < 0.7) {
                     keyItem.collected = true;
+                    playPickupSound();
                     trackerEl.innerText = "OBJETIVO: Guíate por la campana para hallar el Cofre 📦";
                     statusEl.innerText = "SENSACIÓN: ¡Conseguiste la llave!";
                 }
             }
 
-            // 2. Abrir Cofre y tomar Arma sin balas (Invisible)
+            // 2. Abrir Cofre y obtener arma sin balas
             if (keyItem.collected && !chestItem.opened) {
                 let cdx = chestItem.x - player.x; let cdy = chestItem.y - player.y;
                 if (Math.sqrt(cdx*cdx + cdy*cdy) < 0.7) {
                     chestItem.opened = true;
                     hasGun = true;
                     ammoItem.visible = true;
-                    trackerEl.innerText = "OBJETIVO: El arma no tiene balas, ¡encuéntralas! ⚡";
-                    statusEl.innerText = "SENSACIÓN: Sombras extrañas te acechan...";
+                    crosshairEl.style.display = 'block'; // Mirilla activada
+                    playPickupSound();
+                    trackerEl.innerText = "OBJETIVO: ¡Busca las balas escuchando la campana! ⚡";
+                    statusEl.innerText = "SENSACIÓN: Tienes la pistola pero está vacía...";
                 }
             }
 
@@ -455,12 +524,13 @@
                     ammoItem.collected = true;
                     hasAmmo = true;
                     monster.active = true;
-                    trackerEl.innerText = "OBJETIVO: ¡EL JEFE TE ATACA, DISPÁRALE! 💥";
+                    playPickupSound();
+                    trackerEl.innerText = "OBJETIVO: ¡MÁTALO! (2 DISPAROS NECESARIOS) 💥";
                     document.getElementById('btn-shoot').style.display = 'flex';
                 }
             }
 
-            // Sustos/Screamers mientras se buscan las balas
+            // Sustos
             if (hasGun && !hasAmmo) {
                 if (Math.random() < 0.008 && !shadowGhost.active) {
                     shadowGhost.x = player.x + Math.cos(player.angle + 0.3) * 4;
@@ -480,55 +550,120 @@
                 if (shadowGhost.timer <= 0) shadowGhost.active = false;
             }
 
-            // 4. Persecución directa del Jefe
+            // 4. Persecución del Jefe
             if (monster.active) {
-                let mdx = player.x - monster.x; let mdy = player.y - monster.y;
+                let mdx = player.x - monster.x; 
+                let mdy = player.y - monster.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
 
-                statusEl.innerText = "🚨 ¡EL JEFE ESTÁ TRAS DE TI!";
+                if (monster.hp === 2) {
+                    statusEl.innerText = "🚨 ¡EL JEFE TE ATACA! Respuestas: 2 Disparos";
+                }
                 statusEl.style.borderColor = "#ff0000";
                 statusEl.style.color = "#ff6666";
 
-                let dirX = (mdx / dist) * monster.speed; 
-                let dirY = (mdy / dist) * monster.speed;
+                let vx = (mdx / dist) * monster.speed;
+                let vy = (mdy / dist) * monster.speed;
 
-                if (canMoveTo(monster.x + dirX, monster.y + dirY, 0.35)) {
-                    monster.x += dirX; monster.y += dirY;
-                } else if (canMoveTo(monster.x + dirX, monster.y, 0.35)) monster.x += dirX;
-                else if (canMoveTo(monster.x, monster.y + dirY, 0.35)) monster.y += dirY;
-
-                if (audioCtx) {
-                    let mVolume = Math.max(0, 1 - (dist / 8));
-                    monsterGain.gain.setValueAtTime(mVolume * 0.35, audioCtx.currentTime);
+                if (canMoveTo(monster.x + vx, monster.y + vy, 0.3)) {
+                    monster.x += vx; monster.y += vy;
+                } else if (canMoveTo(monster.x + vx, monster.y, 0.3)) {
+                    monster.x += vx;
+                } else if (canMoveTo(monster.x, monster.y + vy, 0.3)) {
+                    monster.y += vy;
                 }
 
-                if (dist < 5) {
-                    let fearPercent = Math.min(100, Math.max(0, (1 - (dist / 5)) * 100));
+                if (audioCtx) {
+                    let mVolume = Math.max(0, 1 - (dist / 10));
+                    monsterGain.gain.setValueAtTime(mVolume * 0.4, audioCtx.currentTime);
+                }
+
+                if (dist < 6) {
+                    let fearPercent = Math.min(100, Math.max(0, (1 - (dist / 6)) * 100));
                     vignetteEl.style.background = `radial-gradient(circle, transparent ${100 - fearPercent}%, rgba(0,0,0,0.95) 100%)`;
                 } else {
                     vignetteEl.style.background = `radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%)`;
                 }
 
-                if (dist < 0.6) triggerJumpscare(true);
+                if (dist < 0.7) {
+                    triggerJumpscare(true);
+                }
             }
         }
 
-        function renderSprite(objX, objY, color, sizeMultiplier = 1) {
+        // DIBUJADO DE OBJETOS CON Z-BUFFER (No atraviesan paredes)
+        function renderCustomObject(objX, objY, zBuffer, numRays, rayWidth, type) {
             const fov = Math.PI / 3.2;
             let mdx = objX - player.x; let mdy = objY - player.y;
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
             let angle = Math.atan2(mdy, mdx) - player.angle;
             while (angle < -Math.PI) angle += Math.PI * 2; while (angle > Math.PI) angle -= Math.PI * 2;
 
-            if (dist > 0.1 && dist < 12 && Math.abs(angle) < fov) {
+            if (dist > 0.2 && dist < 12 && Math.abs(angle) < fov) {
                 let screenX = (canvas.width / 2) + Math.tan(angle) * (canvas.width / 2);
-                let size = Math.min(canvas.height, (canvas.height / dist)) * sizeMultiplier;
-                let top = (canvas.height - size) / 2 + Math.sin(player.bobbing) * 6;
+                let size = Math.min(canvas.height, (canvas.height / dist));
+                let rayIdx = Math.floor(screenX / rayWidth);
 
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.arc(screenX, top + size/2, size/4, 0, Math.PI * 2);
-                ctx.fill();
+                // Verificación de pared previa (Z-Buffer)
+                if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
+                    let top = ((canvas.height - size) / 2) + Math.sin(player.bobbing) * 6;
+
+                    ctx.save();
+                    
+                    if (type === 'key') {
+                        // DIBUJAR LLAVE DORADA
+                        let keySize = size * 0.25;
+                        let centerY = top + size * 0.6;
+                        ctx.fillStyle = "#ffd700";
+                        ctx.strokeStyle = "#b8860b";
+                        ctx.lineWidth = 2;
+
+                        // Anillo
+                        ctx.beginPath();
+                        ctx.arc(screenX, centerY - keySize, keySize * 0.4, 0, Math.PI * 2);
+                        ctx.fill(); ctx.stroke();
+                        // Cuerpo
+                        ctx.fillRect(screenX - keySize*0.1, centerY - keySize*0.6, keySize*0.2, keySize*1.2);
+                        // Dientes
+                        ctx.fillRect(screenX, centerY + keySize*0.2, keySize*0.3, keySize*0.2);
+                        ctx.fillRect(screenX, centerY + keySize*0.4, keySize*0.25, keySize*0.15);
+
+                    } else if (type === 'chest') {
+                        // DIBUJAR COFRE DE MADERA
+                        let cWidth = size * 0.5;
+                        let cHeight = size * 0.35;
+                        let centerY = top + size * 0.65;
+
+                        // Caja
+                        ctx.fillStyle = "#8b4513";
+                        ctx.fillRect(screenX - cWidth/2, centerY - cHeight/2, cWidth, cHeight);
+                        // Bordes metálicos
+                        ctx.strokeStyle = "#ffd700";
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(screenX - cWidth/2, centerY - cHeight/2, cWidth, cHeight);
+                        // Cerradura
+                        ctx.fillStyle = "#ffd700";
+                        ctx.fillRect(screenX - cWidth*0.1, centerY - cHeight*0.1, cWidth*0.2, cHeight*0.3);
+
+                    } else if (type === 'ammo') {
+                        // DIBUJAR BALAS
+                        let bWidth = size * 0.08;
+                        let bHeight = size * 0.25;
+                        let centerY = top + size * 0.65;
+
+                        ctx.fillStyle = "#d4af37";
+                        for(let offset of [-bWidth*1.5, 0, bWidth*1.5]) {
+                            ctx.fillRect(screenX + offset - bWidth/2, centerY - bHeight/2, bWidth, bHeight);
+                            ctx.fillStyle = "#ff4500"; // Punta
+                            ctx.beginPath();
+                            ctx.arc(screenX + offset, centerY - bHeight/2, bWidth/2, Math.PI, 0);
+                            ctx.fill();
+                            ctx.fillStyle = "#d4af37";
+                        }
+                    }
+
+                    ctx.restore();
+                }
             }
         }
 
@@ -609,10 +744,25 @@
                 ctx.fillRect(i * rayWidth, wallTop, rayWidth + 1, wallHeight);
             }
 
-            // Nota: Llave y Cofre ya no se dibujan, se ubican solo por sonido (campanas).
-            if (ammoItem.visible && !ammoItem.collected) renderSprite(ammoItem.x, ammoItem.y, '#ffcc00', 0.5);
+            // RENDERIZADO DE OBJETOS CON FORMATO 3D VISIBLES SOLO DE FRENTE
+            if (!keyItem.collected) renderCustomObject(keyItem.x, keyItem.y, zBuffer, numRays, rayWidth, 'key');
+            if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
+            if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            if (shadowGhost.active) renderSprite(shadowGhost.x, shadowGhost.y, 'rgba(0,0,0,0.85)', 0.9);
+            if (shadowGhost.active) {
+                let mdx = shadowGhost.x - player.x; let mdy = shadowGhost.y - player.y;
+                let dist = Math.sqrt(mdx * mdx + mdy * mdy);
+                let angle = Math.atan2(mdy, mdx) - player.angle;
+                if (dist > 0.1 && dist < 12 && Math.abs(angle) < fov) {
+                    let screenX = (canvas.width / 2) + Math.tan(angle) * (canvas.width / 2);
+                    let rayIdx = Math.floor(screenX / rayWidth);
+                    if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                        let size = Math.min(canvas.height, (canvas.height / dist));
+                        ctx.fillRect(screenX - size/4, (canvas.height - size)/2, size/2, size);
+                    }
+                }
+            }
 
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
@@ -620,7 +770,7 @@
                 let mAngle = Math.atan2(mdy, mdx) - player.angle;
                 while (mAngle < -Math.PI) mAngle += Math.PI * 2; while (mAngle > Math.PI) mAngle -= Math.PI * 2;
 
-                if (dist > 0.1 && dist < 10 && Math.abs(mAngle) < fov) {
+                if (dist > 0.1 && dist < 12 && Math.abs(mAngle) < fov) {
                     let screenX = (canvas.width / 2) + Math.tan(mAngle) * (canvas.width / 2);
                     let mSize = Math.min(canvas.height, (canvas.height / dist));
                     let rayIdx = Math.floor(screenX / rayWidth);
@@ -632,7 +782,9 @@
                         ctx.fillRect(screenX - mSize/6, mTop + mSize/3, mSize/3, mSize * 0.7);
                         ctx.fillStyle = `#151515`;
                         ctx.beginPath(); ctx.arc(screenX, mTop + mSize/4, mSize/4, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = `#ff0000`;
+                        
+                        // Ojos tintados si está herido
+                        ctx.fillStyle = (monster.hp === 1) ? `#ff6600` : `#ff0000`;
                         ctx.beginPath(); ctx.arc(screenX - mSize/10, mTop + mSize/5, mSize/20, 0, Math.PI * 2); ctx.arc(screenX + mSize/10, mTop + mSize/5, mSize/20, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = `#000000`;
                         ctx.beginPath(); ctx.ellipse(screenX, mTop + mSize/3, mSize/12, mSize/8, 0, 0, Math.PI * 2); ctx.fill();
@@ -648,6 +800,7 @@
     </script>
 </body>
 </html>
+
 
 
 
