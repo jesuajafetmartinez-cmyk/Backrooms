@@ -127,12 +127,12 @@
 
     <div id="ui-header">
         <div id="mission-tracker">OBJETIVO: Llave 🗝️ (0.0m)</div>
-        <div id="stealth-status">ESTADO: El monstruo te busca... (0.0m)</div>
+        <div id="stealth-status">ESTADO: Zona segura. Todo está tranquilo...</div>
     </div>
 
     <div id="start-screen">
         <h1 style="color: #c2b144; margin-bottom: 10px;">THE BACKROOMS</h1>
-        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">¡El jefe te rastrea continuamente! Encuentra la llave, el cofre y las balas antes de que te acorrale.</p>
+        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">Encuentra la llave y el cofre para armarte. ¡El monstruo despertará cuando recojas las balas!</p>
         
         <div class="controls-selector">
             <label>MODO DE CÁMARA (ROTACIÓN):</label>
@@ -206,7 +206,8 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
-        let monster = { x: 14.5, y: 14.5, speed: 0.038, active: true, hp: 2 };
+        // El monstruo inicia INACTIVO
+        let monster = { x: 14.5, y: 14.5, speed: 0.052, active: false, hp: 2 };
 
         let keyItem = { x: 1.5, y: 14.5, collected: false };
         let chestItem = { x: 14.5, y: 1.5, opened: false };
@@ -257,7 +258,7 @@
             let mOsc = audioCtx.createOscillator();
             monsterGain = audioCtx.createGain();
             mOsc.type = 'sawtooth'; mOsc.frequency.setValueAtTime(35, audioCtx.currentTime);
-            monsterGain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            monsterGain.gain.setValueAtTime(0, audioCtx.currentTime); // Inicia silenciado
             mOsc.connect(monsterGain); monsterGain.connect(audioCtx.destination);
             mOsc.start();
 
@@ -363,7 +364,7 @@
                 player.x = 1.5; player.y = 1.5;
                 monster.x = 14.5; monster.y = 14.5;
                 monster.hp = 2;
-                monster.speed = 0.038;
+                monster.active = false; // Desactivar monstruo tras morir
                 hasGun = false;
                 hasAmmo = false;
                 keyItem.collected = false;
@@ -372,8 +373,10 @@
                 ammoItem.visible = false;
                 crosshairEl.style.display = 'none';
                 document.getElementById('btn-shoot').style.display = 'none';
+                statusEl.innerText = "ESTADO: Zona segura. Todo está tranquilo...";
                 statusEl.style.borderColor = "#444";
                 statusEl.style.color = "#888";
+                vignetteEl.style.background = `radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%)`;
                 isDead = false;
             }, 1000);
         }
@@ -469,9 +472,9 @@
                 statusEl.style.color = "#ff6666";
             } else {
                 vignetteEl.style.background = `radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%)`;
-                statusEl.innerText = `ESTADO: El monstruo te busca... Monstruo: ${dist.toFixed(1)}m`;
-                statusEl.style.borderColor = "#444";
-                statusEl.style.color = "#aaa";
+                statusEl.innerText = `ESTADO: ¡EL MONSTRUO TE PERSIGUE! (${dist.toFixed(1)}m)`;
+                statusEl.style.borderColor = "#c2b144";
+                statusEl.style.color = "#fff9d6";
             }
 
             if (dist < 0.65) {
@@ -539,7 +542,7 @@
                     }
                 }
             } else {
-                trackerEl.innerText = "OBJETIVO: ¡DISPARA AL MONSTRUO! 💥";
+                trackerEl.innerText = "OBJETIVO: ¡ELIMINA AL MONSTRUO! 💥";
             }
 
             if (!keyItem.collected) {
@@ -561,12 +564,13 @@
                 }
             }
 
+            // AHORA: El monstruo despierta JUSTO AL AGARRAR LAS BALAS
             if (ammoItem.visible && !ammoItem.collected) {
                 let adx = ammoItem.x - player.x; let ady = ammoItem.y - player.y;
                 if (Math.sqrt(adx*adx + ady*ady) < 0.8) {
                     ammoItem.collected = true;
                     hasAmmo = true;
-                    monster.speed = 0.052;
+                    monster.active = true; // <--- SE ACTIVA AQUÍ
                     playPickupSound();
                     document.getElementById('btn-shoot').style.display = 'flex';
                 }
@@ -685,6 +689,7 @@
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
+            // Solo renderizar al monstruo si está ACTIVO
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -720,6 +725,7 @@
     </script>
 </body>
 </html>
+
 
 
 
