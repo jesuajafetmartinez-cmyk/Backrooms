@@ -7,19 +7,19 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; }
-        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; filter: contrast(140%) brightness(75%); }
+        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; filter: contrast(150%) brightness(80%); }
         
         #vignette {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none; z-index: 5;
-            background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.98) 100%);
+            background: radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%);
             transition: background 0.1s ease-out;
         }
 
         #crt-overlay {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none; z-index: 6;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.5) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
             background-size: 100% 4px, 6px 100%;
         }
 
@@ -111,7 +111,6 @@
         .mouth { position: absolute; width: 240px; height: 180px; background: #000; border-radius: 10px 10px 120px 120px; bottom: 30px; left: 70px; border: 4px solid #a00; overflow: hidden; }
         .teeth { width: 100%; height: 25px; background: repeating-linear-gradient(90deg, #fff, #fff 12px, #000 12px, #000 22px); }
 
-        /* Overlay para Screamer Aleatorio */
         #random-screamer-overlay {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.92); z-index: 90; display: none; justify-content: center; align-items: center;
@@ -168,7 +167,7 @@
     <div id="start-screen">
         <h1 style="color: #8a7d26; margin-bottom: 5px; letter-spacing: 3px; text-shadow: 0 0 12px rgba(138,125,38,0.4);">THE BACKROOMS</h1>
         <p style="color: #555; font-size: 11px; margin-bottom: 15px;">NIVEL 0 - NINGÚN LUGAR</p>
-        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado: la llave desencadenará eventos paranormales impredecibles.</p>
+        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado: la llave despertará presencias oscuras...</p>
         
         <div class="controls-selector">
             <label>CONTROL DE CÁMARA:</label>
@@ -259,6 +258,10 @@
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
         let monster = { x: 14.5, y: 14.5, speed: 0.055, active: false, hp: 2, animFrame: 0 };
 
+        // SISTEMA DE SOMBRAS MERODEADORAS (Terror Psicológico)
+        let activeShadow = null; // { x, y, opacity: 1.0, isFading: false }
+        let nextShadowSpawnTime = 0;
+
         let keyItem = { x: 1.5, y: 14.5, collected: false };
         let chestItem = { x: 14.5, y: 1.5, opened: false };
         let ammoItem = { x: 7.5, y: 7.5, collected: false, visible: false };
@@ -267,7 +270,6 @@
         let hasAmmo = false;
         let recoilTimer = 0;
         
-        // Variables para la atenuación suave y ocasional de iluminación
         let flickerLight = 1.0; 
         let targetLight = 1.0; 
 
@@ -277,7 +279,6 @@
         let keys = { fwd: false, back: false, left: false, right: false };
         let audioCtx = null, monsterGain = null, humGain = null, gameStarted = false, isDead = false;
 
-        // Variables de horror y screamers aleatorios
         let nextRandomScreamerTime = 0;
         let screenShake = 0;
 
@@ -306,7 +307,6 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             audioCtx.resume();
 
-            // Zumbido característico de luces de Backrooms
             let humOsc = audioCtx.createOscillator();
             humGain = audioCtx.createGain();
             humOsc.type = 'sawtooth'; humOsc.frequency.setValueAtTime(60, audioCtx.currentTime);
@@ -325,21 +325,16 @@
             programarAtenuacionOcasional();
         }
 
-        // Sistema de atenuación suave de luz (en vez de parpadeos agresivos)
         function programarAtenuacionOcasional() {
-            // Tiempo entre atenuaciones: entre 8 y 16 segundos
-            const tiempoEspera = Math.floor(Math.random() * 8000) + 8000;
+            const tiempoEspera = Math.floor(Math.random() * 10000) + 10000;
 
             setTimeout(() => {
                 if (!isDead) {
-                    // Baja la luz solo un poco (al 50% u 60% de su capacidad)
-                    targetLight = 0.5 + Math.random() * 0.15;
-
-                    // Mantiene el brillo atenuado durante 1.8 segundos y luego regresa suavemente al 100%
+                    targetLight = 0.6 + Math.random() * 0.2;
                     setTimeout(() => {
                         targetLight = 1.0;
                         if (gameStarted) programarAtenuacionOcasional();
-                    }, 1800);
+                    }, 1500);
                 } else if (gameStarted) {
                     programarAtenuacionOcasional();
                 }
@@ -439,28 +434,27 @@
             let osc = audioCtx.createOscillator();
             let gain = audioCtx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-            osc.frequency.linearRampToValueAtTime(120, audioCtx.currentTime + 0.25);
-            gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
             osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
         }
 
         function triggerRandomScreamer() {
             if (isDead) return;
             playDistortedScreamerSound();
-            screenShake = 15;
-            targetLight = 0.45; // Bajada suave puntual durante screamer
+            screenShake = 10;
+            targetLight = 0.5;
 
             const screamerOverlay = document.getElementById('random-screamer-overlay');
             screamerOverlay.style.display = 'flex';
 
-            let duration = 150 + Math.random() * 250;
             setTimeout(() => {
                 screamerOverlay.style.display = 'none';
                 targetLight = 1.0;
-            }, duration);
+            }, 120);
         }
 
         function triggerJumpscare() {
@@ -477,6 +471,7 @@
                 monster.x = 14.5; monster.y = 14.5;
                 monster.hp = 2;
                 monster.active = false;
+                activeShadow = null;
                 if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
                 hasGun = false;
@@ -492,7 +487,7 @@
                 statusEl.innerText = "ESTADO: Zona segura. Silencio absoluto...";
                 statusEl.style.borderColor = "#222";
                 statusEl.style.color = "#666";
-                vignetteEl.style.background = `radial-gradient(circle, transparent 20%, rgba(0,0,0,0.98) 100%)`;
+                vignetteEl.style.background = `radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%)`;
                 
                 isDead = false;
             }, 1200);
@@ -552,6 +547,46 @@
             return true;
         }
 
+        function updateShadows() {
+            if (!keyItem.collected) return;
+            let now = Date.now();
+
+            // Intento de spawn de sombra merodeadora
+            if (!activeShadow && now > nextShadowSpawnTime) {
+                let spawnAngle = player.angle + (Math.random() > 0.5 ? 1 : -1) * (Math.PI * 0.4 + Math.random() * 0.5);
+                let dist = 3.5 + Math.random() * 3.5;
+                let sx = player.x + Math.cos(spawnAngle) * dist;
+                let sy = player.y + Math.sin(spawnAngle) * dist;
+
+                if (canMoveTo(sx, sy, 0.2)) {
+                    activeShadow = { x: sx, y: sy, opacity: 0.85, isFading: false };
+                }
+                nextShadowSpawnTime = now + 12000 + Math.random() * 18000;
+            }
+
+            // Comportamiento de desvanecimiento
+            if (activeShadow) {
+                let sdx = activeShadow.x - player.x;
+                let sdy = activeShadow.y - player.y;
+                let sDist = Math.sqrt(sdx * sdx + sdy * sdy);
+                let sAngle = Math.atan2(sdy, sdx) - player.angle;
+                while (sAngle < -Math.PI) sAngle += Math.PI * 2;
+                while (sAngle > Math.PI) sAngle -= Math.PI * 2;
+
+                // Si la mira directamente (< 30 grados) o se acerca a menos de 2 metros
+                if (Math.abs(sAngle) < 0.55 || sDist < 2.0) {
+                    activeShadow.isFading = true;
+                }
+
+                if (activeShadow.isFading) {
+                    activeShadow.opacity -= 0.04;
+                    if (activeShadow.opacity <= 0) {
+                        activeShadow = null;
+                    }
+                }
+            }
+        }
+
         function updateMonsterAI() {
             if (!monster.active) {
                 if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
@@ -575,9 +610,6 @@
                     monster.x += moveX;
                 } else if (canMoveTo(monster.x, monster.y + moveY, 0.3)) {
                     monster.y += moveY;
-                } else {
-                    if (canMoveTo(monster.x + monster.speed, monster.y, 0.3)) monster.x += monster.speed;
-                    else if (canMoveTo(monster.x, monster.y + monster.speed, 0.3)) monster.y += monster.speed;
                 }
             }
 
@@ -588,12 +620,12 @@
 
             if (dist < 5) {
                 let danger = Math.min(100, Math.max(0, (1 - (dist / 5)) * 100));
-                vignetteEl.style.background = `radial-gradient(circle, transparent ${60 - danger}%, rgba(180,0,0,0.95) 100%)`;
+                vignetteEl.style.background = `radial-gradient(circle, transparent ${55 - danger}%, rgba(180,0,0,0.95) 100%)`;
                 statusEl.innerText = `🚨 ¡ESTÁ DETRÁS DE TI! Distancia: ${dist.toFixed(1)}m`;
                 statusEl.style.borderColor = "#ff0000";
                 statusEl.style.color = "#ff4444";
             } else {
-                vignetteEl.style.background = `radial-gradient(circle, transparent 20%, rgba(0,0,0,0.98) 100%)`;
+                vignetteEl.style.background = `radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%)`;
                 statusEl.innerText = `ESTADO: ¡AMENAZA EN PERSECUCIÓN! (${dist.toFixed(1)}m)`;
                 statusEl.style.borderColor = "#8a7d26";
                 statusEl.style.color = "#fff9d6";
@@ -609,23 +641,24 @@
             let moveSpeed = 0.045; 
             let rotSpeed = 0.045 * sensitivity;
 
-            // Transición progresiva y suave de la luz (sin parpadeo brusco)
             flickerLight += (targetLight - flickerLight) * 0.04;
 
-            // Control de Zumbido adaptado a la intensidad de luz
             if (humGain && audioCtx) {
                 humGain.gain.setValueAtTime(0.01 + flickerLight * 0.03, audioCtx.currentTime);
             }
 
-            // Sistema de Screamers aleatorios tras agarrar la llave
+            // REDUCCIÓN DRÁSTICA DE SCREAMERS (Baja probabilidad, mayor intervalo)
             if (keyItem.collected) {
                 let now = Date.now();
                 if (now > nextRandomScreamerTime) {
-                    triggerRandomScreamer();
-                    // Establece el siguiente screamer entre 4 y 12 segundos
-                    nextRandomScreamerTime = now + 4000 + Math.random() * 8000;
+                    if (Math.random() < 0.15) { // Solo 15% de probabilidad al cumplirse el tiempo
+                        triggerRandomScreamer();
+                    }
+                    nextRandomScreamerTime = now + 18000 + Math.random() * 25000;
                 }
             }
+
+            updateShadows();
 
             if (recoilTimer > 0) recoilTimer--;
             if (screenShake > 0) screenShake *= 0.8;
@@ -684,10 +717,10 @@
                 if (Math.sqrt(kdx*kdx + kdy*kdy) < 0.75) {
                     keyItem.collected = true;
                     playPickupSound();
-                    // Configura el primer screamer aleatorio poco después de recoger la llave
-                    nextRandomScreamerTime = Date.now() + 2000 + Math.random() * 4000;
-                    statusEl.innerText = "ESTADO: SIENTES UNA PRESENCIA MALIGNA...";
-                    statusEl.style.color = "#ff3333";
+                    nextRandomScreamerTime = Date.now() + 15000 + Math.random() * 20000;
+                    nextShadowSpawnTime = Date.now() + 3000;
+                    statusEl.innerText = "ESTADO: SIENTES SOMBRAS MERODEANDO...";
+                    statusEl.style.color = "#ff8833";
                 }
             }
 
@@ -714,7 +747,7 @@
             }
         }
 
-        function renderCustomObject(objX, objY, zBuffer, numRays, rayWidth, type) {
+        function renderCustomObject(objX, objY, zBuffer, numRays, rayWidth, type, extraData = {}) {
             const fov = Math.PI / 3.0;
             let mdx = objX - player.x; let mdy = objY - player.y;
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -730,7 +763,22 @@
                     let top = ((canvas.height - size) / 2) + Math.sin(player.bobbing) * 6;
                     ctx.save();
                     
-                    if (type === 'key') {
+                    if (type === 'shadow') {
+                        let opacity = extraData.opacity || 0.8;
+                        let shadowWidth = size * 0.35;
+                        let shadowHeight = size * 0.9;
+                        let centerY = top + size * 0.5;
+
+                        let grad = ctx.createRadialGradient(screenX, centerY, 5, screenX, centerY, shadowWidth);
+                        grad.addColorStop(0, `rgba(0,0,0,${opacity})`);
+                        grad.addColorStop(0.7, `rgba(5,2,10,${opacity * 0.7})`);
+                        grad.addColorStop(1, 'transparent');
+
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.ellipse(screenX, centerY, shadowWidth, shadowHeight * 0.5, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (type === 'key') {
                         let keySize = size * 0.25;
                         let centerY = top + size * 0.6;
                         ctx.fillStyle = "#ffd700"; ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2;
@@ -760,7 +808,6 @@
         }
 
         function renderCeilingLights(halfH, camOffsetY) {
-            // Renderizado de Paneles Flourescentes del Techo de Backrooms
             let lightSpacing = 160;
             let timeOffset = (Date.now() * 0.02) % lightSpacing;
             
@@ -778,6 +825,26 @@
                 if ((y + timeOffset) % lightSpacing < 25) {
                     ctx.fillRect(posX, lightY, width, 6 * (1 - distanceRatio));
                 }
+            }
+            ctx.restore();
+        }
+
+        // AGREGADO: Renderizado de suelo rugoso y húmedo (Sensación Claustrofóbica)
+        function renderTexturedFloor(halfH, camOffsetY) {
+            ctx.save();
+            for (let y = 0; y < halfH; y += 4) {
+                let screenY = halfH + y + camOffsetY;
+                let distanceRatio = y / halfH;
+                
+                // Variación de tono para simular parches húmedos/sucios de alfombra
+                let baseTone = Math.floor(18 * distanceRatio * flickerLight);
+                let pattern = (Math.floor(y / 8) % 2 === 0) ? 1.1 : 0.9;
+                let r = Math.floor(baseTone * 1.2 * pattern);
+                let g = Math.floor(baseTone * 1.0 * pattern);
+                let b = Math.floor(baseTone * 0.4 * pattern);
+
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(0, screenY, canvas.width, 4);
             }
             ctx.restore();
         }
@@ -816,7 +883,7 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // RENDERIZADO TECHO Y PISO
+            // TECHO
             let ceilingGrad = ctx.createLinearGradient(0, 0, 0, halfH);
             ceilingGrad.addColorStop(0, '#050502');
             ceilingGrad.addColorStop(1, '#1a1808');
@@ -825,11 +892,8 @@
 
             renderCeilingLights(halfH, camOffsetY);
 
-            let floorGrad = ctx.createLinearGradient(0, halfH, 0, canvas.height);
-            floorGrad.addColorStop(0, '#120d04');
-            floorGrad.addColorStop(1, '#020100');
-            ctx.fillStyle = floorGrad;
-            ctx.fillRect(0, halfH + camOffsetY, canvas.width, halfH - camOffsetY);
+            // SUELO TEXTURIZADO
+            renderTexturedFloor(halfH, camOffsetY);
 
             if (!gameStarted) { ctx.restore(); return; }
 
@@ -837,7 +901,7 @@
             const rayWidth = 1;
             let zBuffer = [];
 
-            // RAYCASTING
+            // RAYCASTING DE PAREDES
             for (let i = 0; i < numRays; i++) {
                 let rayAngle = (player.angle - fov / 2) + (i / numRays) * fov;
                 let distance = 0; let hit = 0;
@@ -854,7 +918,6 @@
                 let correctedDist = distance * Math.cos(rayAngle - player.angle);
                 let wallHeight = (canvas.height / (correctedDist + 0.001));
 
-                // Iluminación suave ajustada por flickerLight
                 let lightFactor = Math.max(0, (1 - (correctedDist / 6.5))) * flickerLight;
                 let r = Math.floor(140 * lightFactor);
                 let g = Math.floor(125 * lightFactor);
@@ -865,10 +928,15 @@
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
                 ctx.fillRect(i, wallTop, 1, wallHeight);
 
-                // Sombras profundas
-                ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                ctx.fillRect(i, wallTop, 1, wallHeight * 0.08);
-                ctx.fillRect(i, wallTop + wallHeight * 0.92, 1, wallHeight * 0.08);
+                // OCLUSIÓN AMBIENTAL / SOMBRAS EN BORDES (Mejora Gráfica x3)
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(i, wallTop, 1, wallHeight * 0.12);
+                ctx.fillRect(i, wallTop + wallHeight * 0.88, 1, wallHeight * 0.12);
+            }
+
+            // RENDER SOMBRA MERODEADORA (Si está activa)
+            if (activeShadow) {
+                renderCustomObject(activeShadow.x, activeShadow.y, zBuffer, numRays, rayWidth, 'shadow', { opacity: activeShadow.opacity });
             }
 
             // OBJETOS DEL MAPA
@@ -876,7 +944,7 @@
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            // MONSTRUO/ENTIDAD
+            // MONSTRUO PRINCIPAL
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -912,8 +980,8 @@
 
             renderWeapon();
 
-            // GRANULARIDAD / RUIDO VHS INTENSO
-            ctx.fillStyle = `rgba(255,255,255,${0.03 + Math.random() * 0.04})`;
+            // RUIDO VHS ANALÓGICO
+            ctx.fillStyle = `rgba(255,255,255,${0.02 + Math.random() * 0.03})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.restore();
@@ -924,5 +992,6 @@
     </script>
 </body>
 </html>
+
 
 
