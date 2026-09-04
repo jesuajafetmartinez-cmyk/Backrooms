@@ -13,7 +13,7 @@
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none; z-index: 5;
             background: radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%);
-            transition: background 0.1s ease-out;
+            transition: background 0.2s ease-out;
         }
 
         #crt-overlay {
@@ -111,31 +111,10 @@
         .mouth { position: absolute; width: 240px; height: 180px; background: #000; border-radius: 10px 10px 120px 120px; bottom: 30px; left: 70px; border: 4px solid #a00; overflow: hidden; }
         .teeth { width: 100%; height: 25px; background: repeating-linear-gradient(90deg, #fff, #fff 12px, #000 12px, #000 22px); }
 
-        #random-screamer-overlay {
-            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(120,0,0,0.85); z-index: 90; display: none; justify-content: center; align-items: center;
-            pointer-events: none;
-        }
-        #random-screamer-face {
-            width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
-            animation: fastShake 0.01s infinite;
-        }
-        .screamer-head {
-            width: 420px; height: 500px; background: #110000; border-radius: 50% 50% 40% 40%;
-            position: relative; border: 5px solid #f00; box-shadow: 0 0 200px #ff0000;
-            filter: invert(100%);
-        }
-
         @keyframes shake {
             0% { transform: translate(20px, 20px) scale(1.15) rotate(2deg); }
             50% { transform: translate(-20px, -20px) scale(1.3) rotate(-2deg); }
             100% { transform: translate(20px, -20px) scale(1.15) rotate(0deg); }
-        }
-
-        @keyframes fastShake {
-            0% { transform: translate(30px, -30px) scale(1.4); }
-            50% { transform: translate(-30px, 30px) scale(1.2); }
-            100% { transform: translate(15px, 15px) scale(1.3); }
         }
 
         #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
@@ -161,13 +140,13 @@
 
     <div id="ui-header">
         <div id="mission-tracker">OBJETIVO: Llave 🗝️ (0.0m)</div>
-        <div id="stealth-status">ESTADO: Zona segura. Silencio absoluto...</div>
+        <div id="stealth-status">ESTADO: La criatura anda cerca... Mantén distancia.</div>
     </div>
 
     <div id="start-screen">
         <h1 style="color: #8a7d26; margin-bottom: 5px; letter-spacing: 3px; text-shadow: 0 0 12px rgba(138,125,38,0.4);">THE BACKROOMS</h1>
-        <p style="color: #555; font-size: 11px; margin-bottom: 15px;">NIVEL 0 - NINGÚN LUGAR</p>
-        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado con los encuentros repentinos...</p>
+        <p style="color: #555; font-size: 11px; margin-bottom: 15px;">NIVEL 0 - CAZA SILENCIOSA</p>
+        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">La criatura ya merodea los pasillos. Recoge la llave, abre el cofre y toma la munición. Cuando tengas todo, vendrá directo a por ti.</p>
         
         <div class="controls-selector">
             <label>CONTROL DE CÁMARA:</label>
@@ -187,7 +166,7 @@
 
     <div id="win-screen" style="display: none;">
         <h1 style="color: #44c25d; margin-bottom: 10px;">AMENAZA NEUTRALIZADA</h1>
-        <p style="color: #aaa; font-size: 13px;">Has sobrevivido al encuentro en la nada.</p>
+        <p style="color: #aaa; font-size: 13px;">Has sobrevivido a la cacería.</p>
         <button class="btn-screen" onclick="location.reload()">REINICIAR SIMULACIÓN</button>
     </div>
 
@@ -197,16 +176,6 @@
                 <div class="eye left"><div class="pupil"></div></div>
                 <div class="eye right"><div class="pupil"></div></div>
                 <div class="mouth"><div class="teeth"></div></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="random-screamer-overlay">
-        <div id="random-screamer-face">
-            <div class="screamer-head">
-                <div class="eye left" style="background:#000;"><div class="pupil" style="background:#fff;"></div></div>
-                <div class="eye right" style="background:#000;"><div class="pupil" style="background:#fff;"></div></div>
-                <div class="mouth" style="background:#fff;"><div class="teeth" style="background: repeating-linear-gradient(90deg, #000, #000 12px, #fff 12px, #fff 22px);"></div></div>
             </div>
         </div>
     </div>
@@ -256,9 +225,20 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
-        let monster = { x: 14.5, y: 14.5, speed: 0.055, active: false, hp: 2, animFrame: 0 };
+        
+        // El monstruo existe desde el inicio pero en modo roaming
+        let monster = { 
+            x: 14.5, y: 14.5, 
+            speed: 0.025, // Velocidad baja cuando merodea
+            aggressiveSpeed: 0.068, // Muy rápido cuando te persigue
+            isAggressive: false, 
+            hp: 2, 
+            animFrame: 0,
+            dirX: 1, dirY: 0,
+            changeDirTimer: 0
+        };
 
-        let activeShadow = null;
+        let activeShadows = [];
         let nextShadowSpawnTime = 0;
 
         let keyItem = { x: 1.5, y: 14.5, collected: false };
@@ -301,7 +281,6 @@
         let keys = { fwd: false, back: false, left: false, right: false };
         let audioCtx = null, monsterGain = null, humGain = null, gameStarted = false, isDead = false;
 
-        let nextRandomScreamerTime = 0;
         let screenShake = 0;
 
         function selectControlMode(mode) {
@@ -453,45 +432,6 @@
             osc.start(); osc.stop(audioCtx.currentTime + 0.7);
         }
 
-        function playDistortedScreamerSound() {
-            if (!audioCtx) return;
-            let osc = audioCtx.createOscillator();
-            let gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(500, audioCtx.currentTime);
-            osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.25);
-            gain.gain.setValueAtTime(0.7, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.25);
-        }
-
-        function playShadowShockSound() {
-            if (!audioCtx) return;
-            let osc = audioCtx.createOscillator();
-            let gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.4);
-            gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
-        }
-
-        function triggerRandomScreamer() {
-            if (isDead) return;
-            playDistortedScreamerSound();
-            screenShake = 15;
-            
-            const screamerOverlay = document.getElementById('random-screamer-overlay');
-            screamerOverlay.style.display = 'flex';
-
-            setTimeout(() => {
-                screamerOverlay.style.display = 'none';
-            }, 180);
-        }
-
         function triggerJumpscare() {
             if (isDead) return;
             isDead = true;
@@ -505,8 +445,8 @@
                 
                 monster.x = 14.5; monster.y = 14.5;
                 monster.hp = 2;
-                monster.active = false;
-                activeShadow = null;
+                monster.isAggressive = false;
+                activeShadows = [];
                 if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
                 hasGun = false;
@@ -521,7 +461,7 @@
                 crosshairEl.style.display = 'none';
                 document.getElementById('btn-shoot').style.display = 'none';
                 
-                statusEl.innerText = "ESTADO: Zona segura. Silencio absoluto...";
+                statusEl.innerText = "ESTADO: La criatura anda cerca... Mantén distancia.";
                 statusEl.style.borderColor = "#222";
                 statusEl.style.color = "#666";
                 vignetteEl.style.background = `radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%)`;
@@ -531,7 +471,7 @@
         }
 
         function shoot() {
-            if (!hasGun || !hasAmmo || !monster.active) return;
+            if (!hasGun || !hasAmmo) return;
             playGunshotSound();
             recoilTimer = 8;
 
@@ -547,12 +487,11 @@
                 playMonsterHurtSound();
 
                 if (monster.hp <= 0) {
-                    monster.active = false;
                     if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
                     document.getElementById('win-screen').style.display = 'flex';
                 } else {
-                    monster.x -= (mdx / dist) * 0.8;
-                    monster.y -= (mdy / dist) * 0.8;
+                    monster.x -= (mdx / dist) * 1.2;
+                    monster.y -= (mdy / dist) * 1.2;
                 }
             }
         }
@@ -585,111 +524,112 @@
         }
 
         function updateShadows() {
-            if (!keyItem.collected) return;
             let now = Date.now();
 
-            if (!activeShadow && now > nextShadowSpawnTime) {
-                let isCornerSpawn = Math.random() < 0.5; // 50% de prob de salir justo en una esquina
-                let spawnDist = isCornerSpawn ? (1.2 + Math.random() * 0.5) : (3.0 + Math.random() * 2.0);
-                let angleOffset = isCornerSpawn ? (Math.random() < 0.5 ? 0.6 : -0.6) : (Math.random() - 0.5) * 0.3;
+            if (activeShadows.length < 2 && now > nextShadowSpawnTime) {
+                let spawnDist = 4.0 + Math.random() * 3.0; // Siempre nacen a distancia razonable
+                let angleOffset = (Math.random() - 0.5) * 1.2;
 
                 let sx = player.x + Math.cos(player.angle + angleOffset) * spawnDist;
                 let sy = player.y + Math.sin(player.angle + angleOffset) * spawnDist;
 
                 if (canMoveTo(sx, sy, 0.25)) {
-                    activeShadow = {
+                    activeShadows.push({
                         x: sx,
                         y: sy,
-                        initialDist: spawnDist,
-                        opacity: 1.0,
-                        isCornerScreamer: isCornerSpawn,
-                        triggeredShock: false,
-                        holdTimer: 0
-                    };
+                        opacity: 1.0
+                    });
                 }
 
-                nextShadowSpawnTime = now + 2500 + Math.random() * 2500;
+                nextShadowSpawnTime = now + 3000 + Math.random() * 4000;
             }
 
-            if (activeShadow) {
-                let sdx = activeShadow.x - player.x;
-                let sdy = activeShadow.y - player.y;
+            // Actualizar desvanecimiento de sombras cuando el jugador las mira o se acerca
+            for (let i = activeShadows.length - 1; i >= 0; i--) {
+                let s = activeShadows[i];
+                let sdx = s.x - player.x;
+                let sdy = s.y - player.y;
                 let sDist = Math.sqrt(sdx * sdx + sdy * sdy);
 
-                if (activeShadow.isCornerScreamer && sDist < 1.8) {
-                    // SI ES DE ESQUINA Y TE LA ENCUENTRAS DE GOLPE:
-                    if (!activeShadow.triggeredShock) {
-                        activeShadow.triggeredShock = true;
-                        playShadowShockSound();
-                        screenShake = 12;
+                // Desvanecer progresivamente mientras estés caminando hacia ella
+                if (sDist < 3.5) {
+                    s.opacity -= 0.03;
+                }
 
-                        // Destello Rojo en Pantalla (como el monstruo)
-                        vignetteEl.style.background = `radial-gradient(circle, transparent 10%, rgba(200, 0, 0, 0.95) 100%)`;
-                        setTimeout(() => {
-                            if (!monster.active) vignetteEl.style.background = `radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%)`;
-                        }, 300);
-
-                        activeShadow.holdTimer = Date.now() + 1000; // Se queda congelada 1 segundo
-                    }
-
-                    if (Date.now() > activeShadow.holdTimer) {
-                        activeShadow.opacity -= 0.08;
-                        if (activeShadow.opacity <= 0) activeShadow = null;
-                    }
-                } else {
-                    // SI ESTÁ A DISTANCIA Y TE VAS ACERCANDO:
-                    let progress = sDist / activeShadow.initialDist;
-                    activeShadow.opacity = Math.max(0, Math.min(1, progress * 1.2));
-
-                    if (sDist < 0.8 || activeShadow.opacity <= 0.05) {
-                        activeShadow = null;
-                    }
+                if (sDist < 0.8 || s.opacity <= 0) {
+                    activeShadows.splice(i, 1);
                 }
             }
         }
 
         function updateMonsterAI() {
-            if (!monster.active) {
-                if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-                return;
-            }
-
             monster.animFrame += 0.25;
 
             let mdx = player.x - monster.x;
             let mdy = player.y - monster.y;
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
 
-            let moveX = (mdx / dist) * monster.speed;
-            let moveY = (mdy / dist) * monster.speed;
-
-            if (canMoveTo(monster.x + moveX, monster.y + moveY, 0.3)) {
-                monster.x += moveX;
-                monster.y += moveY;
-            } else {
-                if (canMoveTo(monster.x + moveX, monster.y, 0.3)) {
-                    monster.x += moveX;
-                } else if (canMoveTo(monster.x, monster.y + moveY, 0.3)) {
-                    monster.y += moveY;
+            if (!monster.isAggressive) {
+                // MODOLO PATRULLA / MERODEO INICIAL
+                let now = Date.now();
+                if (now > monster.changeDirTimer) {
+                    let dirs = [
+                        {x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}
+                    ];
+                    let chosen = dirs[Math.floor(Math.random() * dirs.length)];
+                    monster.dirX = chosen.x;
+                    monster.dirY = chosen.y;
+                    monster.changeDirTimer = now + 2000 + Math.random() * 3000;
                 }
-            }
 
-            if (audioCtx && monsterGain) {
-                let vol = Math.max(0.05, 1 - (dist / 12));
-                monsterGain.gain.setValueAtTime(vol * 0.6, audioCtx.currentTime);
-            }
+                let nextX = monster.x + monster.dirX * monster.speed;
+                let nextY = monster.y + monster.dirY * monster.speed;
 
-            if (dist < 5) {
-                let danger = Math.min(100, Math.max(0, (1 - (dist / 5)) * 100));
+                if (canMoveTo(nextX, nextY, 0.3)) {
+                    monster.x = nextX;
+                    monster.y = nextY;
+                } else {
+                    monster.changeDirTimer = 0; // Cambiar dirección si choca pared
+                }
+
+                if (audioCtx && monsterGain) {
+                    let vol = Math.max(0, 1 - (dist / 10));
+                    monsterGain.gain.setValueAtTime(vol * 0.2, audioCtx.currentTime);
+                }
+
+                if (dist < 4) {
+                    statusEl.innerText = `⚠️ CUIDADO: Criatura cerca (${dist.toFixed(1)}m). Se mueve sin rumbo...`;
+                    statusEl.style.borderColor = "#8a7d26";
+                    statusEl.style.color = "#fff9d6";
+                } else {
+                    statusEl.innerText = `ESTADO: Escuchas pasos lejanos en el laberinto...`;
+                    statusEl.style.borderColor = "#222";
+                    statusEl.style.color = "#666";
+                }
+
+            } else {
+                // MODO CAZA TOTAL (AGRESIVO TRAS RECOGER TODO)
+                let moveX = (mdx / dist) * monster.aggressiveSpeed;
+                let moveY = (mdy / dist) * monster.aggressiveSpeed;
+
+                if (canMoveTo(monster.x + moveX, monster.y + moveY, 0.3)) {
+                    monster.x += moveX;
+                    monster.y += moveY;
+                } else {
+                    if (canMoveTo(monster.x + moveX, monster.y, 0.3)) monster.x += moveX;
+                    else if (canMoveTo(monster.x, monster.y + moveY, 0.3)) monster.y += moveY;
+                }
+
+                if (audioCtx && monsterGain) {
+                    let vol = Math.max(0.1, 1 - (dist / 14));
+                    monsterGain.gain.setValueAtTime(vol * 0.8, audioCtx.currentTime);
+                }
+
+                let danger = Math.min(100, Math.max(0, (1 - (dist / 6)) * 100));
                 vignetteEl.style.background = `radial-gradient(circle, transparent ${55 - danger}%, rgba(180,0,0,0.95) 100%)`;
-                statusEl.innerText = `🚨 ¡ESTÁ DETRÁS DE TI! Distancia: ${dist.toFixed(1)}m`;
+                statusEl.innerText = `🚨 ¡TE HA DETECTADO! CORRE (${dist.toFixed(1)}m)`;
                 statusEl.style.borderColor = "#ff0000";
                 statusEl.style.color = "#ff4444";
-            } else {
-                vignetteEl.style.background = `radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%)`;
-                statusEl.innerText = `ESTADO: ¡AMENAZA EN PERSECUCIÓN! (${dist.toFixed(1)}m)`;
-                statusEl.style.borderColor = "#8a7d26";
-                statusEl.style.color = "#fff9d6";
             }
 
             if (dist < 0.65) {
@@ -706,15 +646,6 @@
 
             if (humGain && audioCtx) {
                 humGain.gain.setValueAtTime(0.01 + flickerLight * 0.03, audioCtx.currentTime);
-            }
-
-            // SCREAMERS EN PANTALLA CADA 8-15 SEGUNDOS TRAS TENER LA LLAVE
-            if (keyItem.collected) {
-                let now = Date.now();
-                if (now > nextRandomScreamerTime) {
-                    triggerRandomScreamer();
-                    nextRandomScreamerTime = now + 8000 + Math.random() * 7000;
-                }
             }
 
             updateShadows();
@@ -768,7 +699,7 @@
                     }
                 }
             } else {
-                trackerEl.innerText = "OBJETIVO: ¡DESTRUYE A LA ENTIDAD! 💥";
+                trackerEl.innerText = "OBJETIVO: ¡ELIMINA A LA ENTIDAD! 💥";
             }
 
             if (!keyItem.collected) {
@@ -776,10 +707,6 @@
                 if (Math.sqrt(kdx*kdx + kdy*kdy) < 0.75) {
                     keyItem.collected = true;
                     playPickupSound();
-                    nextRandomScreamerTime = Date.now() + 5000; // Primer screamer a los 5s de tomar la llave
-                    nextShadowSpawnTime = Date.now() + 1000;
-                    statusEl.innerText = "ESTADO: SIENTES SOMBRAS MERODEANDO...";
-                    statusEl.style.color = "#ff8833";
                 }
             }
 
@@ -799,7 +726,7 @@
                 if (Math.sqrt(adx*adx + ady*ady) < 0.8) {
                     ammoItem.collected = true;
                     hasAmmo = true;
-                    monster.active = true;
+                    monster.isAggressive = true; // SE VUELVE LOCO Y TE EMPIEZA A BUSCAR
                     playPickupSound();
                     document.getElementById('btn-shoot').style.display = 'flex';
                 }
@@ -1000,44 +927,44 @@
                 ctx.fillRect(i, wallTop + wallHeight * 0.88, 1, wallHeight * 0.12);
             }
 
-            if (activeShadow) {
-                renderCustomObject(activeShadow.x, activeShadow.y, zBuffer, numRays, rayWidth, 'shadow', { opacity: activeShadow.opacity });
+            for (let s of activeShadows) {
+                renderCustomObject(s.x, s.y, zBuffer, numRays, rayWidth, 'shadow', { opacity: s.opacity });
             }
 
             if (!keyItem.collected) renderCustomObject(keyItem.x, keyItem.y, zBuffer, numRays, rayWidth, 'key');
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            if (monster.active) {
-                let mdx = monster.x - player.x; let mdy = monster.y - player.y;
-                let dist = Math.sqrt(mdx * mdx + mdy * mdy);
-                let mAngle = Math.atan2(mdy, mdx) - player.angle;
-                while (mAngle < -Math.PI) mAngle += Math.PI * 2; while (mAngle > Math.PI) mAngle -= Math.PI * 2;
+            // Renderizado de la entidad constante
+            let mdx = monster.x - player.x; let mdy = monster.y - player.y;
+            let dist = Math.sqrt(mdx * mdx + mdy * mdy);
+            let mAngle = Math.atan2(mdy, mdx) - player.angle;
+            while (mAngle < -Math.PI) mAngle += Math.PI * 2; while (mAngle > Math.PI) mAngle -= Math.PI * 2;
 
-                if (dist > 0.1 && dist < 12 && Math.abs(mAngle) < fov) {
-                    let screenX = (canvas.width / 2) + Math.tan(mAngle) * (canvas.width / 2);
-                    let mSize = Math.min(canvas.height * 1.5, (canvas.height / dist));
-                    let rayIdx = Math.floor(screenX);
+            if (dist > 0.1 && dist < 12 && Math.abs(mAngle) < fov) {
+                let screenX = (canvas.width / 2) + Math.tan(mAngle) * (canvas.width / 2);
+                let mSize = Math.min(canvas.height * 1.5, (canvas.height / dist));
+                let rayIdx = Math.floor(screenX);
 
-                    if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
-                        let mTop = ((canvas.height - mSize) / 2) + camOffsetY;
+                if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
+                    let mTop = ((canvas.height - mSize) / 2) + camOffsetY;
 
-                        ctx.save();
-                        let glitch = Math.sin(monster.animFrame) * 6;
-                        ctx.fillStyle = `#000`;
-                        ctx.beginPath();
-                        ctx.ellipse(screenX + glitch, mTop + mSize*0.5, mSize*0.18, mSize*0.48, 0, 0, Math.PI * 2);
-                        ctx.fill();
+                    ctx.save();
+                    let glitch = Math.sin(monster.animFrame) * 6;
+                    ctx.fillStyle = `#000`;
+                    ctx.beginPath();
+                    ctx.ellipse(screenX + glitch, mTop + mSize*0.5, mSize*0.18, mSize*0.48, 0, 0, Math.PI * 2);
+                    ctx.fill();
 
-                        ctx.fillStyle = monster.hp === 1 ? `#ffaa00` : `#ff0000`;
-                        ctx.shadowColor = '#f00'; ctx.shadowBlur = 20;
-                        ctx.beginPath();
-                        ctx.arc(screenX - mSize*0.05 + glitch, mTop + mSize*0.3, Math.max(1, mSize*0.025), 0, Math.PI * 2);
-                        ctx.arc(screenX + mSize*0.05 + glitch, mTop + mSize*0.3, Math.max(1, mSize*0.025), 0, Math.PI * 2);
-                        ctx.fill();
+                    // Ojos amarillos si merodea, rojos furiosos si te persigue
+                    ctx.fillStyle = !monster.isAggressive ? `#ffcc00` : (monster.hp === 1 ? `#ffaa00` : `#ff0000`);
+                    ctx.shadowColor = monster.isAggressive ? '#f00' : '#ff0'; ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(screenX - mSize*0.05 + glitch, mTop + mSize*0.3, Math.max(1, mSize*0.025), 0, Math.PI * 2);
+                    ctx.arc(screenX + mSize*0.05 + glitch, mTop + mSize*0.3, Math.max(1, mSize*0.025), 0, Math.PI * 2);
+                    ctx.fill();
 
-                        ctx.restore();
-                    }
+                    ctx.restore();
                 }
             }
 
@@ -1054,4 +981,5 @@
     </script>
 </body>
 </html>
+
 
