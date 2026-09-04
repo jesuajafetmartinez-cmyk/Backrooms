@@ -266,7 +266,10 @@
         let hasGun = false;
         let hasAmmo = false;
         let recoilTimer = 0;
-        let flickerLight = 0.8;
+        
+        // Variables para la atenuación suave y ocasional de iluminación
+        let flickerLight = 1.0; 
+        let targetLight = 1.0; 
 
         let lastBellTime = 0;
         let controlMode = 'drag';
@@ -319,6 +322,28 @@
             mOsc.start();
 
             gameStarted = true;
+            programarAtenuacionOcasional();
+        }
+
+        // Sistema de atenuación suave de luz (en vez de parpadeos agresivos)
+        function programarAtenuacionOcasional() {
+            // Tiempo entre atenuaciones: entre 8 y 16 segundos
+            const tiempoEspera = Math.floor(Math.random() * 8000) + 8000;
+
+            setTimeout(() => {
+                if (!isDead) {
+                    // Baja la luz solo un poco (al 50% u 60% de su capacidad)
+                    targetLight = 0.5 + Math.random() * 0.15;
+
+                    // Mantiene el brillo atenuado durante 1.8 segundos y luego regresa suavemente al 100%
+                    setTimeout(() => {
+                        targetLight = 1.0;
+                        if (gameStarted) programarAtenuacionOcasional();
+                    }, 1800);
+                } else if (gameStarted) {
+                    programarAtenuacionOcasional();
+                }
+            }, tiempoEspera);
         }
 
         let touchStartX = null;
@@ -426,7 +451,7 @@
             if (isDead) return;
             playDistortedScreamerSound();
             screenShake = 15;
-            flickerLight = 0.0;
+            targetLight = 0.45; // Bajada suave puntual durante screamer
 
             const screamerOverlay = document.getElementById('random-screamer-overlay');
             screamerOverlay.style.display = 'flex';
@@ -434,6 +459,7 @@
             let duration = 150 + Math.random() * 250;
             setTimeout(() => {
                 screamerOverlay.style.display = 'none';
+                targetLight = 1.0;
             }, duration);
         }
 
@@ -583,13 +609,12 @@
             let moveSpeed = 0.045; 
             let rotSpeed = 0.045 * sensitivity;
 
-            // Parpadeo de luces violento e irregular
-            if (Math.random() < 0.08) flickerLight = Math.random() < 0.3 ? 0 : Math.random() * 0.5;
-            else flickerLight = Math.min(1.0, flickerLight + 0.08);
+            // Transición progresiva y suave de la luz (sin parpadeo brusco)
+            flickerLight += (targetLight - flickerLight) * 0.04;
 
-            // Control de Zumbido dinámico por parpadeo
+            // Control de Zumbido adaptado a la intensidad de luz
             if (humGain && audioCtx) {
-                humGain.gain.setValueAtTime(0.01 + flickerLight * 0.04, audioCtx.currentTime);
+                humGain.gain.setValueAtTime(0.01 + flickerLight * 0.03, audioCtx.currentTime);
             }
 
             // Sistema de Screamers aleatorios tras agarrar la llave
@@ -829,7 +854,7 @@
                 let correctedDist = distance * Math.cos(rayAngle - player.angle);
                 let wallHeight = (canvas.height / (correctedDist + 0.001));
 
-                // Iluminación opresiva y sombreado
+                // Iluminación suave ajustada por flickerLight
                 let lightFactor = Math.max(0, (1 - (correctedDist / 6.5))) * flickerLight;
                 let r = Math.floor(140 * lightFactor);
                 let g = Math.floor(125 * lightFactor);
@@ -887,7 +912,7 @@
 
             renderWeapon();
 
-            // GRA NULARIDAD / RUIDO VHS INTENSO
+            // GRANULARIDAD / RUIDO VHS INTENSO
             ctx.fillStyle = `rgba(255,255,255,${0.03 + Math.random() * 0.04})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -899,4 +924,5 @@
     </script>
 </body>
 </html>
+
 
