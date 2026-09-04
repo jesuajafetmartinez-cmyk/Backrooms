@@ -167,7 +167,7 @@
     <div id="start-screen">
         <h1 style="color: #8a7d26; margin-bottom: 5px; letter-spacing: 3px; text-shadow: 0 0 12px rgba(138,125,38,0.4);">THE BACKROOMS</h1>
         <p style="color: #555; font-size: 11px; margin-bottom: 15px;">NIVEL 0 - NINGÚN LUGAR</p>
-        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado: la llave despertará presencias oscuras...</p>
+        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado: las sombras te observarán en los pasillos...</p>
         
         <div class="controls-selector">
             <label>CONTROL DE CÁMARA:</label>
@@ -258,13 +258,35 @@
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
         let monster = { x: 14.5, y: 14.5, speed: 0.055, active: false, hp: 2, animFrame: 0 };
 
-        // SISTEMA DE SOMBRAS MERODEADORAS (Terror Psicológico)
-        let activeShadow = null; // { x, y, opacity: 1.0, isFading: false }
+        let activeShadow = null;
         let nextShadowSpawnTime = 0;
 
         let keyItem = { x: 1.5, y: 14.5, collected: false };
         let chestItem = { x: 14.5, y: 1.5, opened: false };
         let ammoItem = { x: 7.5, y: 7.5, collected: false, visible: false };
+
+        function getRandomValidPosition(excludeList = []) {
+            let validPositions = [];
+            for (let r = 1; r < MAP_SIZE - 1; r++) {
+                for (let c = 1; c < MAP_SIZE - 1; c++) {
+                    if (mainMap[r][c] === 0) {
+                        let isExcluded = excludeList.some(p => Math.abs(p.x - (c + 0.5)) < 1.5 && Math.abs(p.y - (r + 0.5)) < 1.5);
+                        if (!isExcluded) validPositions.push({ x: c + 0.5, y: r + 0.5 });
+                    }
+                }
+            }
+            if (validPositions.length === 0) return { x: 1.5, y: 1.5 };
+            return validPositions[Math.floor(Math.random() * validPositions.length)];
+        }
+
+        function randomizeItems() {
+            let startPos = { x: player.x, y: player.y };
+            let keyPos = getRandomValidPosition([startPos]);
+            keyItem.x = keyPos.x; keyItem.y = keyPos.y;
+
+            let chestPos = getRandomValidPosition([startPos, keyPos]);
+            chestItem.x = chestPos.x; chestItem.y = chestPos.y;
+        }
 
         let hasGun = false;
         let hasAmmo = false;
@@ -303,6 +325,8 @@
                 document.getElementById('btn-left').style.display = 'flex';
                 document.getElementById('btn-right').style.display = 'flex';
             }
+
+            randomizeItems();
 
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             audioCtx.resume();
@@ -481,6 +505,8 @@
                 ammoItem.collected = false;
                 ammoItem.visible = false;
 
+                randomizeItems();
+
                 crosshairEl.style.display = 'none';
                 document.getElementById('btn-shoot').style.display = 'none';
                 
@@ -551,35 +577,30 @@
             if (!keyItem.collected) return;
             let now = Date.now();
 
-            // Intento de spawn de sombra merodeadora
             if (!activeShadow && now > nextShadowSpawnTime) {
-                let spawnAngle = player.angle + (Math.random() > 0.5 ? 1 : -1) * (Math.PI * 0.4 + Math.random() * 0.5);
+                let spawnAngle = player.angle + (Math.random() > 0.5 ? 1 : -1) * (Math.PI * 0.3 + Math.random() * 0.4);
                 let dist = 3.5 + Math.random() * 3.5;
                 let sx = player.x + Math.cos(spawnAngle) * dist;
                 let sy = player.y + Math.sin(spawnAngle) * dist;
 
                 if (canMoveTo(sx, sy, 0.2)) {
-                    activeShadow = { x: sx, y: sy, opacity: 0.85, isFading: false };
+                    activeShadow = { x: sx, y: sy, opacity: 0.9, isFading: false };
                 }
                 nextShadowSpawnTime = now + 12000 + Math.random() * 18000;
             }
 
-            // Comportamiento de desvanecimiento
             if (activeShadow) {
                 let sdx = activeShadow.x - player.x;
                 let sdy = activeShadow.y - player.y;
                 let sDist = Math.sqrt(sdx * sdx + sdy * sdy);
-                let sAngle = Math.atan2(sdy, sdx) - player.angle;
-                while (sAngle < -Math.PI) sAngle += Math.PI * 2;
-                while (sAngle > Math.PI) sAngle -= Math.PI * 2;
 
-                // Si la mira directamente (< 30 grados) o se acerca a menos de 2 metros
-                if (Math.abs(sAngle) < 0.55 || sDist < 2.0) {
+                // Solo se desvanece al acercarse mucho (menos de 1.8m)
+                if (sDist < 1.8) {
                     activeShadow.isFading = true;
                 }
 
                 if (activeShadow.isFading) {
-                    activeShadow.opacity -= 0.04;
+                    activeShadow.opacity -= 0.05;
                     if (activeShadow.opacity <= 0) {
                         activeShadow = null;
                     }
@@ -647,11 +668,10 @@
                 humGain.gain.setValueAtTime(0.01 + flickerLight * 0.03, audioCtx.currentTime);
             }
 
-            // REDUCCIÓN DRÁSTICA DE SCREAMERS (Baja probabilidad, mayor intervalo)
             if (keyItem.collected) {
                 let now = Date.now();
                 if (now > nextRandomScreamerTime) {
-                    if (Math.random() < 0.15) { // Solo 15% de probabilidad al cumplirse el tiempo
+                    if (Math.random() < 0.15) {
                         triggerRandomScreamer();
                     }
                     nextRandomScreamerTime = now + 18000 + Math.random() * 25000;
@@ -778,6 +798,21 @@
                         ctx.beginPath();
                         ctx.ellipse(screenX, centerY, shadowWidth, shadowHeight * 0.5, 0, 0, Math.PI * 2);
                         ctx.fill();
+
+                        // OJOS ROJOS BRILLANTES
+                        let eyeDistance = size * 0.05;
+                        let eyeHeight = centerY - shadowHeight * 0.2;
+                        let eyeSize = Math.max(1.5, size * 0.02);
+
+                        ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
+                        ctx.shadowColor = '#f00';
+                        ctx.shadowBlur = 12;
+
+                        ctx.beginPath();
+                        ctx.arc(screenX - eyeDistance, eyeHeight, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(screenX + eyeDistance, eyeHeight, eyeSize, 0, Math.PI * 2);
+                        ctx.fill();
+
                     } else if (type === 'key') {
                         let keySize = size * 0.25;
                         let centerY = top + size * 0.6;
@@ -829,14 +864,12 @@
             ctx.restore();
         }
 
-        // AGREGADO: Renderizado de suelo rugoso y húmedo (Sensación Claustrofóbica)
         function renderTexturedFloor(halfH, camOffsetY) {
             ctx.save();
             for (let y = 0; y < halfH; y += 4) {
                 let screenY = halfH + y + camOffsetY;
                 let distanceRatio = y / halfH;
                 
-                // Variación de tono para simular parches húmedos/sucios de alfombra
                 let baseTone = Math.floor(18 * distanceRatio * flickerLight);
                 let pattern = (Math.floor(y / 8) % 2 === 0) ? 1.1 : 0.9;
                 let r = Math.floor(baseTone * 1.2 * pattern);
@@ -883,7 +916,6 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // TECHO
             let ceilingGrad = ctx.createLinearGradient(0, 0, 0, halfH);
             ceilingGrad.addColorStop(0, '#050502');
             ceilingGrad.addColorStop(1, '#1a1808');
@@ -891,8 +923,6 @@
             ctx.fillRect(0, 0, canvas.width, halfH + camOffsetY);
 
             renderCeilingLights(halfH, camOffsetY);
-
-            // SUELO TEXTURIZADO
             renderTexturedFloor(halfH, camOffsetY);
 
             if (!gameStarted) { ctx.restore(); return; }
@@ -901,7 +931,6 @@
             const rayWidth = 1;
             let zBuffer = [];
 
-            // RAYCASTING DE PAREDES
             for (let i = 0; i < numRays; i++) {
                 let rayAngle = (player.angle - fov / 2) + (i / numRays) * fov;
                 let distance = 0; let hit = 0;
@@ -928,23 +957,19 @@
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
                 ctx.fillRect(i, wallTop, 1, wallHeight);
 
-                // OCLUSIÓN AMBIENTAL / SOMBRAS EN BORDES (Mejora Gráfica x3)
                 ctx.fillStyle = 'rgba(0,0,0,0.7)';
                 ctx.fillRect(i, wallTop, 1, wallHeight * 0.12);
                 ctx.fillRect(i, wallTop + wallHeight * 0.88, 1, wallHeight * 0.12);
             }
 
-            // RENDER SOMBRA MERODEADORA (Si está activa)
             if (activeShadow) {
                 renderCustomObject(activeShadow.x, activeShadow.y, zBuffer, numRays, rayWidth, 'shadow', { opacity: activeShadow.opacity });
             }
 
-            // OBJETOS DEL MAPA
             if (!keyItem.collected) renderCustomObject(keyItem.x, keyItem.y, zBuffer, numRays, rayWidth, 'key');
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            // MONSTRUO PRINCIPAL
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -980,7 +1005,6 @@
 
             renderWeapon();
 
-            // RUIDO VHS ANALÓGICO
             ctx.fillStyle = `rgba(255,255,255,${0.02 + Math.random() * 0.03})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -992,6 +1016,7 @@
     </script>
 </body>
 </html>
+
 
 
 
