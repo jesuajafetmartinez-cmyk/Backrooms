@@ -66,20 +66,26 @@
 
         .controls-selector {
             margin-top: 15px; background: rgba(255,255,255,0.02); padding: 12px;
-            border-radius: 8px; border: 1px solid #222; width: 100%; max-width: 320px;
+            border-radius: 8px; border: 1px solid #222; width: 100%; max-width: 380px;
             display: flex; flex-direction: column; gap: 10px;
         }
 
         .controls-selector label { color: #8a7d26; font-size: 12px; font-weight: bold; }
-        .radio-group { display: flex; justify-content: space-around; gap: 10px; }
+        .radio-group { display: flex; justify-content: space-around; gap: 6px; }
 
         .radio-option {
-            background: #101010; border: 1px solid #333; color: #888; padding: 8px 12px;
-            border-radius: 4px; font-size: 11px; cursor: pointer; flex: 1; transition: 0.2s;
+            background: #101010; border: 1px solid #333; color: #888; padding: 8px 6px;
+            border-radius: 4px; font-size: 10px; cursor: pointer; flex: 1; transition: 0.2s;
         }
 
         .radio-option.selected {
             background: #8a7d26; color: #000; font-weight: bold; border-color: #fff9d6;
+        }
+
+        #pc-manual {
+            display: none; background: rgba(0,0,0,0.6); border: 1px dashed #8a7d26;
+            padding: 8px; border-radius: 4px; color: #ccc; font-size: 10px; text-align: left;
+            line-height: 1.5; margin-top: 5px;
         }
 
         .sensitivity-container { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 5px; }
@@ -149,10 +155,19 @@
         <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">La criatura ya merodea los pasillos. Recoge la llave, abre el cofre y toma la munición. Cuando tengas todo, vendrá directo a por ti.</p>
         
         <div class="controls-selector">
-            <label>CONTROL DE CÁMARA:</label>
+            <label>MODO DE CONTROL:</label>
             <div class="radio-group">
                 <div class="radio-option selected" id="opt-drag" onclick="selectControlMode('drag')">🖐️ Arrastrar</div>
                 <div class="radio-option" id="opt-buttons" onclick="selectControlMode('buttons')">🕹️ Botones</div>
+                <div class="radio-option" id="opt-pc" onclick="selectControlMode('pc')">💻 Teclado (PC)</div>
+            </div>
+
+            <div id="pc-manual">
+                <strong style="color: #8a7d26;">CONTROLES PC:</strong><br>
+                • <b>W / S:</b> Avanzar / Retroceder<br>
+                • <b>A / D:</b> Desplazamiento Lateral<br>
+                • <b>Flechas Izq / Der:</b> Girar Cámara<br>
+                • <b>Shift:</b> Disparar
             </div>
 
             <div class="sensitivity-container">
@@ -226,11 +241,10 @@
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
         
-        // El monstruo existe desde el inicio pero en modo roaming
         let monster = { 
             x: 14.5, y: 14.5, 
-            speed: 0.025, // Velocidad baja cuando merodea
-            aggressiveSpeed: 0.068, // Muy rápido cuando te persigue
+            speed: 0.025,
+            aggressiveSpeed: 0.068,
             isAggressive: false, 
             hp: 2, 
             animFrame: 0,
@@ -278,7 +292,7 @@
         let lastBellTime = 0;
         let controlMode = 'drag';
         let sensitivity = 1.0;
-        let keys = { fwd: false, back: false, left: false, right: false };
+        let keys = { fwd: false, back: false, left: false, right: false, strafeLeft: false, strafeRight: false };
         let audioCtx = null, monsterGain = null, humGain = null, gameStarted = false, isDead = false;
 
         let screenShake = 0;
@@ -287,6 +301,9 @@
             controlMode = mode;
             document.getElementById('opt-drag').classList.toggle('selected', mode === 'drag');
             document.getElementById('opt-buttons').classList.toggle('selected', mode === 'buttons');
+            document.getElementById('opt-pc').classList.toggle('selected', mode === 'pc');
+
+            document.getElementById('pc-manual').style.display = (mode === 'pc') ? 'block' : 'none';
         }
 
         function updateSensitivity(val) {
@@ -297,10 +314,14 @@
         function startGame() {
             document.getElementById('start-screen').style.display = 'none';
 
-            if (controlMode === 'drag') {
+            if (controlMode === 'pc') {
+                document.getElementById('ui').style.display = 'none';
+            } else if (controlMode === 'drag') {
+                document.getElementById('ui').style.display = 'block';
                 document.getElementById('btn-left').style.display = 'none';
                 document.getElementById('btn-right').style.display = 'none';
             } else {
+                document.getElementById('ui').style.display = 'block';
                 document.getElementById('btn-left').style.display = 'flex';
                 document.getElementById('btn-right').style.display = 'flex';
             }
@@ -362,6 +383,30 @@
         });
 
         window.addEventListener('touchend', () => { touchStartX = null; });
+
+        // Eventos de teclado para soporte de PC
+        window.addEventListener('keydown', (e) => {
+            if (!gameStarted) return;
+            let k = e.key.toLowerCase();
+            if (k === 'w') keys.fwd = true;
+            if (k === 's') keys.back = true;
+            if (k === 'a') keys.strafeLeft = true;
+            if (k === 'd') keys.strafeRight = true;
+            if (e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'ArrowRight') keys.right = true;
+            if (e.key === 'Shift') shoot();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (!gameStarted) return;
+            let k = e.key.toLowerCase();
+            if (k === 'w') keys.fwd = false;
+            if (k === 's') keys.back = false;
+            if (k === 'a') keys.strafeLeft = false;
+            if (k === 'd') keys.strafeRight = false;
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowRight') keys.right = false;
+        });
 
         function playPickupSound() {
             if (!audioCtx) return;
@@ -527,7 +572,7 @@
             let now = Date.now();
 
             if (activeShadows.length < 2 && now > nextShadowSpawnTime) {
-                let spawnDist = 4.0 + Math.random() * 3.0; // Siempre nacen a distancia razonable
+                let spawnDist = 4.0 + Math.random() * 3.0;
                 let angleOffset = (Math.random() - 0.5) * 1.2;
 
                 let sx = player.x + Math.cos(player.angle + angleOffset) * spawnDist;
@@ -544,14 +589,12 @@
                 nextShadowSpawnTime = now + 3000 + Math.random() * 4000;
             }
 
-            // Actualizar desvanecimiento de sombras cuando el jugador las mira o se acerca
             for (let i = activeShadows.length - 1; i >= 0; i--) {
                 let s = activeShadows[i];
                 let sdx = s.x - player.x;
                 let sdy = s.y - player.y;
                 let sDist = Math.sqrt(sdx * sdx + sdy * sdy);
 
-                // Desvanecer progresivamente mientras estés caminando hacia ella
                 if (sDist < 3.5) {
                     s.opacity -= 0.03;
                 }
@@ -570,7 +613,6 @@
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
 
             if (!monster.isAggressive) {
-                // MODOLO PATRULLA / MERODEO INICIAL
                 let now = Date.now();
                 if (now > monster.changeDirTimer) {
                     let dirs = [
@@ -589,7 +631,7 @@
                     monster.x = nextX;
                     monster.y = nextY;
                 } else {
-                    monster.changeDirTimer = 0; // Cambiar dirección si choca pared
+                    monster.changeDirTimer = 0;
                 }
 
                 if (audioCtx && monsterGain) {
@@ -608,7 +650,6 @@
                 }
 
             } else {
-                // MODO CAZA TOTAL (AGRESIVO TRAS RECOGER TODO)
                 let moveX = (mdx / dist) * monster.aggressiveSpeed;
                 let moveY = (mdy / dist) * monster.aggressiveSpeed;
 
@@ -653,14 +694,16 @@
             if (recoilTimer > 0) recoilTimer--;
             if (screenShake > 0) screenShake *= 0.8;
 
-            if (controlMode === 'buttons') {
-                if (keys.left) player.angle -= rotSpeed;
-                if (keys.right) player.angle += rotSpeed;
-            }
+            if (keys.left) player.angle -= rotSpeed;
+            if (keys.right) player.angle += rotSpeed;
 
             let dx = 0, dy = 0;
             if (keys.fwd) { dx += Math.cos(player.angle) * moveSpeed; dy += Math.sin(player.angle) * moveSpeed; }
             if (keys.back) { dx -= Math.cos(player.angle) * moveSpeed; dy -= Math.sin(player.angle) * moveSpeed; }
+
+            // Desplazamiento lateral (Strafe para teclado)
+            if (keys.strafeLeft) { dx += Math.cos(player.angle - Math.PI / 2) * moveSpeed; dy += Math.sin(player.angle - Math.PI / 2) * moveSpeed; }
+            if (keys.strafeRight) { dx += Math.cos(player.angle + Math.PI / 2) * moveSpeed; dy += Math.sin(player.angle + Math.PI / 2) * moveSpeed; }
 
             if (dx !== 0 || dy !== 0) player.bobbing += 0.16;
             else player.bobbing = 0;
@@ -726,9 +769,9 @@
                 if (Math.sqrt(adx*adx + ady*ady) < 0.8) {
                     ammoItem.collected = true;
                     hasAmmo = true;
-                    monster.isAggressive = true; // SE VUELVE LOCO Y TE EMPIEZA A BUSCAR
+                    monster.isAggressive = true;
                     playPickupSound();
-                    document.getElementById('btn-shoot').style.display = 'flex';
+                    if (controlMode !== 'pc') document.getElementById('btn-shoot').style.display = 'flex';
                 }
             }
         }
@@ -935,7 +978,6 @@
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
-            // Renderizado de la entidad constante
             let mdx = monster.x - player.x; let mdy = monster.y - player.y;
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
             let mAngle = Math.atan2(mdy, mdx) - player.angle;
@@ -956,7 +998,6 @@
                     ctx.ellipse(screenX + glitch, mTop + mSize*0.5, mSize*0.18, mSize*0.48, 0, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Ojos amarillos si merodea, rojos furiosos si te persigue
                     ctx.fillStyle = !monster.isAggressive ? `#ffcc00` : (monster.hp === 1 ? `#ffaa00` : `#ff0000`);
                     ctx.shadowColor = monster.isAggressive ? '#f00' : '#ff0'; ctx.shadowBlur = 20;
                     ctx.beginPath();
@@ -981,5 +1022,6 @@
     </script>
 </body>
 </html>
+
 
 
