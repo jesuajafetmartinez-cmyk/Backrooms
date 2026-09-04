@@ -113,7 +113,7 @@
 
         #random-screamer-overlay {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.92); z-index: 90; display: none; justify-content: center; align-items: center;
+            background: rgba(120,0,0,0.85); z-index: 90; display: none; justify-content: center; align-items: center;
             pointer-events: none;
         }
         #random-screamer-face {
@@ -167,7 +167,7 @@
     <div id="start-screen">
         <h1 style="color: #8a7d26; margin-bottom: 5px; letter-spacing: 3px; text-shadow: 0 0 12px rgba(138,125,38,0.4);">THE BACKROOMS</h1>
         <p style="color: #555; font-size: 11px; margin-bottom: 15px;">NIVEL 0 - NINGÚN LUGAR</p>
-        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado: las sombras te observarán en los pasillos...</p>
+        <p style="color: #999; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. Cuidado con los encuentros repentinos...</p>
         
         <div class="controls-selector">
             <label>CONTROL DE CÁMARA:</label>
@@ -350,15 +350,15 @@
         }
 
         function programarAtenuacionOcasional() {
-            const tiempoEspera = Math.floor(Math.random() * 10000) + 10000;
+            const tiempoEspera = Math.floor(Math.random() * 8000) + 8000;
 
             setTimeout(() => {
                 if (!isDead) {
-                    targetLight = 0.6 + Math.random() * 0.2;
+                    targetLight = 0.5 + Math.random() * 0.2;
                     setTimeout(() => {
                         targetLight = 1.0;
                         if (gameStarted) programarAtenuacionOcasional();
-                    }, 1500);
+                    }, 1200);
                 } else if (gameStarted) {
                     programarAtenuacionOcasional();
                 }
@@ -458,40 +458,38 @@
             let osc = audioCtx.createOscillator();
             let gain = audioCtx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-            osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.2);
-            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+            osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+            gain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
             osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.25);
         }
 
-        function playShadowVanishSound() {
+        function playShadowShockSound() {
             if (!audioCtx) return;
             let osc = audioCtx.createOscillator();
             let gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(280, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.18);
-            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.4);
+            gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
             osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
         }
 
         function triggerRandomScreamer() {
             if (isDead) return;
             playDistortedScreamerSound();
-            screenShake = 10;
-            targetLight = 0.5;
-
+            screenShake = 15;
+            
             const screamerOverlay = document.getElementById('random-screamer-overlay');
             screamerOverlay.style.display = 'flex';
 
             setTimeout(() => {
                 screamerOverlay.style.display = 'none';
-                targetLight = 1.0;
-            }, 120);
+            }, 180);
         }
 
         function triggerJumpscare() {
@@ -591,27 +589,26 @@
             let now = Date.now();
 
             if (!activeShadow && now > nextShadowSpawnTime) {
-                // Raycasting frontal para encontrar exactamente dónde está el pasillo visible sin traspasar paredes
-                let step = 0.2;
-                let foundPos = null;
+                let isCornerSpawn = Math.random() < 0.5; // 50% de prob de salir justo en una esquina
+                let spawnDist = isCornerSpawn ? (1.2 + Math.random() * 0.5) : (3.0 + Math.random() * 2.0);
+                let angleOffset = isCornerSpawn ? (Math.random() < 0.5 ? 0.6 : -0.6) : (Math.random() - 0.5) * 0.3;
 
-                for (let d = 1.8; d <= 3.5; d += step) {
-                    let testAngle = player.angle + (Math.random() - 0.5) * 0.4;
-                    let sx = player.x + Math.cos(testAngle) * d;
-                    let sy = player.y + Math.sin(testAngle) * d;
+                let sx = player.x + Math.cos(player.angle + angleOffset) * spawnDist;
+                let sy = player.y + Math.sin(player.angle + angleOffset) * spawnDist;
 
-                    if (canMoveTo(sx, sy, 0.2)) {
-                        foundPos = { x: sx, y: sy };
-                        break;
-                    }
+                if (canMoveTo(sx, sy, 0.25)) {
+                    activeShadow = {
+                        x: sx,
+                        y: sy,
+                        initialDist: spawnDist,
+                        opacity: 1.0,
+                        isCornerScreamer: isCornerSpawn,
+                        triggeredShock: false,
+                        holdTimer: 0
+                    };
                 }
 
-                if (foundPos) {
-                    activeShadow = { x: foundPos.x, y: foundPos.y, opacity: 0.95, isFading: false, soundPlayed: false };
-                }
-
-                // Frecuencia extremadamente alta (2 a 4 segundos)
-                nextShadowSpawnTime = now + 2000 + Math.random() * 2000;
+                nextShadowSpawnTime = now + 2500 + Math.random() * 2500;
             }
 
             if (activeShadow) {
@@ -619,18 +616,32 @@
                 let sdy = activeShadow.y - player.y;
                 let sDist = Math.sqrt(sdx * sdx + sdy * sdy);
 
-                // Desaparecen cuando estás LITERALMENTE enfrente (menos de 1.0 metro)
-                if (sDist < 1.0 && !activeShadow.isFading) {
-                    activeShadow.isFading = true;
-                    if (!activeShadow.soundPlayed) {
-                        playShadowVanishSound();
-                        activeShadow.soundPlayed = true;
-                    }
-                }
+                if (activeShadow.isCornerScreamer && sDist < 1.8) {
+                    // SI ES DE ESQUINA Y TE LA ENCUENTRAS DE GOLPE:
+                    if (!activeShadow.triggeredShock) {
+                        activeShadow.triggeredShock = true;
+                        playShadowShockSound();
+                        screenShake = 12;
 
-                if (activeShadow.isFading) {
-                    activeShadow.opacity -= 0.12;
-                    if (activeShadow.opacity <= 0) {
+                        // Destello Rojo en Pantalla (como el monstruo)
+                        vignetteEl.style.background = `radial-gradient(circle, transparent 10%, rgba(200, 0, 0, 0.95) 100%)`;
+                        setTimeout(() => {
+                            if (!monster.active) vignetteEl.style.background = `radial-gradient(circle, transparent 15%, rgba(0,0,0,0.99) 100%)`;
+                        }, 300);
+
+                        activeShadow.holdTimer = Date.now() + 1000; // Se queda congelada 1 segundo
+                    }
+
+                    if (Date.now() > activeShadow.holdTimer) {
+                        activeShadow.opacity -= 0.08;
+                        if (activeShadow.opacity <= 0) activeShadow = null;
+                    }
+                } else {
+                    // SI ESTÁ A DISTANCIA Y TE VAS ACERCANDO:
+                    let progress = sDist / activeShadow.initialDist;
+                    activeShadow.opacity = Math.max(0, Math.min(1, progress * 1.2));
+
+                    if (sDist < 0.8 || activeShadow.opacity <= 0.05) {
                         activeShadow = null;
                     }
                 }
@@ -697,13 +708,12 @@
                 humGain.gain.setValueAtTime(0.01 + flickerLight * 0.03, audioCtx.currentTime);
             }
 
+            // SCREAMERS EN PANTALLA CADA 8-15 SEGUNDOS TRAS TENER LA LLAVE
             if (keyItem.collected) {
                 let now = Date.now();
                 if (now > nextRandomScreamerTime) {
-                    if (Math.random() < 0.15) {
-                        triggerRandomScreamer();
-                    }
-                    nextRandomScreamerTime = now + 18000 + Math.random() * 25000;
+                    triggerRandomScreamer();
+                    nextRandomScreamerTime = now + 8000 + Math.random() * 7000;
                 }
             }
 
@@ -766,8 +776,8 @@
                 if (Math.sqrt(kdx*kdx + kdy*kdy) < 0.75) {
                     keyItem.collected = true;
                     playPickupSound();
-                    nextRandomScreamerTime = Date.now() + 15000 + Math.random() * 20000;
-                    nextShadowSpawnTime = Date.now() + 1000; // La primera sombra aparece a 1 segundo de tomar la llave
+                    nextRandomScreamerTime = Date.now() + 5000; // Primer screamer a los 5s de tomar la llave
+                    nextShadowSpawnTime = Date.now() + 1000;
                     statusEl.innerText = "ESTADO: SIENTES SOMBRAS MERODEANDO...";
                     statusEl.style.color = "#ff8833";
                 }
@@ -813,7 +823,7 @@
                     ctx.save();
                     
                     if (type === 'shadow') {
-                        let opacity = extraData.opacity || 0.8;
+                        let opacity = extraData.opacity !== undefined ? extraData.opacity : 0.8;
                         let shadowWidth = size * 0.35;
                         let shadowHeight = size * 0.9;
                         let centerY = top + size * 0.5;
@@ -1044,7 +1054,4 @@
     </script>
 </body>
 </html>
-
-
-
 
