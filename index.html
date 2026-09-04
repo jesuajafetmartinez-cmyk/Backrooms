@@ -3,142 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Pursuit Final Boss</title>
+    <title>The Backrooms - Psychotic Pursuit</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: monospace; touch-action: none; }
-        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; }
+        #canvas { width: 100vw; height: 100vh; display: block; position: absolute; top:0; left:0; z-index: 1; filter: contrast(120%) brightness(90%); }
         
         #vignette {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none; z-index: 5;
-            background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%);
-            transition: background 0.2s ease-out;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.95) 100%);
+            transition: background 0.1s ease-out;
         }
+
+        #crt-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; z-index: 6;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 6px 100%;
+        }
+
+        #rec-indicator {
+            position: absolute; top: 20px; right: 25px; z-index: 15;
+            color: #ff3333; font-weight: bold; font-size: 14px;
+            letter-spacing: 2px; text-shadow: 0 0 8px rgba(255,0,0,0.8);
+            display: flex; align-items: center; gap: 8px; pointer-events: none;
+        }
+        #rec-dot { width: 10px; height: 10px; background: #ff3333; border-radius: 50%; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
         #crosshair {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 16px; height: 16px;
+            width: 12px; height: 12px;
             pointer-events: none; z-index: 20;
-            display: none;
+            display: none; border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
         }
-        #crosshair::before, #crosshair::after {
-            content: ''; position: absolute; background: rgba(255, 255, 255, 0.9);
-        }
-        #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
-        #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
 
         #ui-header {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            z-index: 10; width: 90%; max-width: 420px; display: flex; flex-direction: column; gap: 5px;
+            position: absolute; top: 15px; left: 20px;
+            z-index: 10; display: flex; flex-direction: column; gap: 6px;
         }
 
         #mission-tracker {
-            background: rgba(0,0,0,0.85); border: 2px solid #c2b144; color: #fff9d6;
-            padding: 8px 15px; font-size: 13px; font-weight: bold; border-radius: 8px;
-            text-align: center; box-shadow: 0 0 10px rgba(194, 177, 68, 0.4);
+            background: rgba(10,10,5,0.85); border: 1px solid #c2b144; color: #fff9d6;
+            padding: 6px 12px; font-size: 12px; font-weight: bold; border-radius: 4px;
+            box-shadow: 0 0 10px rgba(194, 177, 68, 0.2); letter-spacing: 1px;
         }
 
         #stealth-status {
-            background: rgba(0,0,0,0.8); border: 1px solid #444; color: #888;
-            padding: 4px 10px; font-size: 11px; border-radius: 5px; text-align: center;
+            background: rgba(5,5,5,0.8); border: 1px solid #333; color: #777;
+            padding: 4px 8px; font-size: 10px; border-radius: 3px; letter-spacing: 1px;
         }
 
         #start-screen, #win-screen {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: #111005; z-index: 200; display: flex;
+            background: #080804; z-index: 200; display: flex;
             flex-direction: column; justify-content: center; align-items: center; text-align: center;
             padding: 20px;
         }
 
         .controls-selector {
-            margin-top: 15px; background: rgba(255,255,255,0.05); padding: 12px;
-            border-radius: 8px; border: 1px solid #444; width: 100%; max-width: 320px;
+            margin-top: 15px; background: rgba(255,255,255,0.03); padding: 12px;
+            border-radius: 8px; border: 1px solid #333; width: 100%; max-width: 320px;
             display: flex; flex-direction: column; gap: 10px;
         }
 
-        .controls-selector label {
-            color: #d8c85c; font-size: 13px; display: block; font-weight: bold;
-        }
-
+        .controls-selector label { color: #d8c85c; font-size: 12px; font-weight: bold; }
         .radio-group { display: flex; justify-content: space-around; gap: 10px; }
 
         .radio-option {
-            background: #222; border: 1px solid #555; color: #fff; padding: 8px 12px;
-            border-radius: 5px; font-size: 12px; cursor: pointer; flex: 1; transition: 0.2s;
+            background: #151515; border: 1px solid #444; color: #aaa; padding: 8px 12px;
+            border-radius: 4px; font-size: 11px; cursor: pointer; flex: 1; transition: 0.2s;
         }
 
         .radio-option.selected {
             background: #c2b144; color: #000; font-weight: bold; border-color: #fff9d6;
         }
 
-        .sensitivity-container {
-            display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 5px;
-        }
-
-        .sensitivity-slider {
-            width: 100%; accent-color: #c2b144; cursor: pointer;
-        }
+        .sensitivity-container { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 5px; }
+        .sensitivity-slider { width: 100%; accent-color: #c2b144; cursor: pointer; }
 
         .btn-screen {
-            background: #c2b144; color: #000; font-weight: bold; font-size: 18px;
-            padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer;
-            box-shadow: 0 0 15px rgba(194, 177, 68, 0.5); margin-top: 20px;
+            background: #c2b144; color: #000; font-weight: bold; font-size: 16px;
+            padding: 12px 28px; border: none; border-radius: 4px; cursor: pointer;
+            box-shadow: 0 0 20px rgba(194, 177, 68, 0.4); margin-top: 20px; letter-spacing: 1px;
         }
 
         #jumpscare-overlay {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: #050000; z-index: 100; display: none; justify-content: center; align-items: center;
+            background: #000; z-index: 100; display: none; justify-content: center; align-items: center;
+            overflow: hidden;
         }
         #jumpscare-face {
-            width: 320px; height: 320px; background: #0a0a0a; border-radius: 50%;
-            box-shadow: 0 0 100px #ff0000; position: relative; animation: shake 0.03s infinite;
-            border: 4px solid #ff0000;
+            width: 100vw; height: 100vh; position: relative; animation: shake 0.02s infinite;
+            background: radial-gradient(circle, #300 0%, #000 70%);
+            display: flex; justify-content: center; align-items: center;
         }
-        .eye { position: absolute; width: 50px; height: 50px; background: #ffffff; border-radius: 50%; top: 70px; box-shadow: 0 0 30px #ffffff; }
+        .entity-head {
+            width: 350px; height: 450px; background: #050505; border-radius: 40% 40% 50% 50%;
+            position: relative; border: 2px solid #500; box-shadow: 0 0 120px #f00;
+        }
+        .eye { position: absolute; width: 70px; height: 70px; background: #fff; border-radius: 50%; top: 100px; box-shadow: 0 0 40px #fff; }
         .eye.left { left: 60px; } .eye.right { right: 60px; }
-        .pupil { width: 15px; height: 15px; background: #8b0000; border-radius: 50%; position: absolute; top: 18px; left: 18px; }
-        .mouth { position: absolute; width: 160px; height: 120px; background: #000; border-radius: 0 0 80px 80px; bottom: 30px; left: 80px; border: 4px solid #ff0000; }
+        .pupil { width: 12px; height: 12px; background: #8b0000; border-radius: 50%; position: absolute; top: 28px; left: 28px; box-shadow: 0 0 10px #f00; }
+        .mouth { position: absolute; width: 200px; height: 160px; background: #000; border-radius: 10px 10px 100px 100px; bottom: 40px; left: 75px; border: 3px solid #800; overflow: hidden; }
+        .teeth { width: 100%; height: 20px; background: repeating-linear-gradient(90deg, #eee, #eee 15px, #000 15px, #000 25px); }
 
         @keyframes shake {
-            0% { transform: translate(10px, 10px) scale(1.2); }
-            50% { transform: translate(-10px, -10px) scale(1.3); }
-            100% { transform: translate(10px, -10px) scale(1.2); }
+            0% { transform: translate(15px, 15px) scale(1.1) rotate(1deg); }
+            50% { transform: translate(-15px, -15px) scale(1.25) rotate(-1deg); }
+            100% { transform: translate(15px, -15px) scale(1.1) rotate(0deg); }
         }
 
         #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         .btn {
-            position: absolute; background: rgba(0, 0, 0, 0.6); border: 2px solid #c2b144;
+            position: absolute; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(194, 177, 68, 0.5);
             color: #d8c85c; font-weight: bold; border-radius: 50%; display: flex;
             align-items: center; justify-content: center; pointer-events: auto; touch-action: manipulation;
+            backdrop-filter: blur(2px);
         }
         #btn-fwd { bottom: 120px; left: 45px; width: 70px; height: 70px; font-size: 24px; }
         #btn-back { bottom: 35px; left: 45px; width: 70px; height: 70px; font-size: 24px; }
         #btn-left { bottom: 45px; right: 105px; width: 70px; height: 70px; font-size: 24px; }
         #btn-right { bottom: 45px; right: 25px; width: 70px; height: 70px; font-size: 24px; }
-        #btn-shoot { bottom: 120px; right: 45px; width: 75px; height: 75px; font-size: 13px; border-radius: 15px; border-color: #ff0000; background: rgba(139,0,0,0.85); color: #fff; display: none; }
+        #btn-shoot { bottom: 120px; right: 45px; width: 75px; height: 75px; font-size: 11px; border-radius: 15px; border-color: #ff3333; background: rgba(100,0,0,0.6); color: #fff; display: none; text-shadow: 0 0 5px #f00; }
     </style>
 </head>
 <body>
 
     <div id="vignette"></div>
+    <div id="crt-overlay"></div>
+    <div id="rec-indicator"><div id="rec-dot"></div>REC [CAM-01]</div>
     <div id="crosshair"></div>
 
     <div id="ui-header">
         <div id="mission-tracker">OBJETIVO: Llave 🗝️ (0.0m)</div>
-        <div id="stealth-status">ESTADO: Zona segura. Todo está tranquilo...</div>
+        <div id="stealth-status">ESTADO: Zona segura. Silencio absoluto...</div>
     </div>
 
     <div id="start-screen">
-        <h1 style="color: #c2b144; margin-bottom: 10px;">THE BACKROOMS</h1>
-        <p style="color: #aaa; max-width: 300px; line-height: 1.4;">Busca la llave, abre el cofre para conseguir el arma y luego toma las balas. ¡El monstruo solo aparecerá al tomar las balas!</p>
+        <h1 style="color: #c2b144; margin-bottom: 5px; letter-spacing: 3px; text-shadow: 0 0 10px rgba(194,177,68,0.3);">THE BACKROOMS</h1>
+        <p style="color: #666; font-size: 11px; margin-bottom: 15px;">NIVEL 0 - NINGÚN LUGAR</p>
+        <p style="color: #aaa; max-width: 320px; line-height: 1.4; font-size: 12px;">Localiza la llave, abre el contenedor con el arma y recupera la munición. La entidad rastreará tu ubicación en cuanto toques las balas.</p>
         
         <div class="controls-selector">
-            <label>MODO DE CÁMARA (ROTACIÓN):</label>
+            <label>CONTROL DE CÁMARA:</label>
             <div class="radio-group">
-                <div class="radio-option selected" id="opt-drag" onclick="selectControlMode('drag')">🖐️ Arrastrar Táctil</div>
-                <div class="radio-option" id="opt-buttons" onclick="selectControlMode('buttons')">🕹️ Botones ◀ ▶</div>
+                <div class="radio-option selected" id="opt-drag" onclick="selectControlMode('drag')">🖐️ Arrastrar</div>
+                <div class="radio-option" id="opt-buttons" onclick="selectControlMode('buttons')">🕹️ Botones</div>
             </div>
 
             <div class="sensitivity-container">
@@ -147,20 +161,22 @@
             </div>
         </div>
 
-        <button class="btn-screen" onclick="startGame()">INICIAR ESCAPE</button>
+        <button class="btn-screen" onclick="startGame()">ENTRAR AL LABERINTO</button>
     </div>
 
     <div id="win-screen" style="display: none;">
-        <h1 style="color: #44c25d; margin-bottom: 10px;">¡JEFE ELIMINADO!</h1>
-        <p style="color: #aaa;">Le diste los 2 disparos y lograste sobrevivir.</p>
-        <button class="btn-screen" onclick="location.reload()">JUGAR DE NUEVO</button>
+        <h1 style="color: #44c25d; margin-bottom: 10px;">AMENAZA NEUTRALIZADA</h1>
+        <p style="color: #aaa; font-size: 13px;">Has sobrevivido al encuentro en la nada.</p>
+        <button class="btn-screen" onclick="location.reload()">REINICIAR SIMULACIÓN</button>
     </div>
 
     <div id="jumpscare-overlay">
         <div id="jumpscare-face">
-            <div class="eye left"><div class="pupil"></div></div>
-            <div class="eye right"><div class="pupil"></div></div>
-            <div class="mouth"></div>
+            <div class="entity-head">
+                <div class="eye left"><div class="pupil"></div></div>
+                <div class="eye right"><div class="pupil"></div></div>
+                <div class="mouth"><div class="teeth"></div></div>
+            </div>
         </div>
     </div>
 
@@ -171,7 +187,7 @@
         <div class="btn" id="btn-back">▼</div>
         <div class="btn" id="btn-left">◀</div>
         <div class="btn" id="btn-right">▶</div>
-        <div class="btn" id="btn-shoot">💥 DISPARAR</div>
+        <div class="btn" id="btn-shoot">DISPARAR</div>
     </div>
 
     <script>
@@ -182,8 +198,30 @@
         const statusEl = document.getElementById('stealth-status');
         const crosshairEl = document.getElementById('crosshair');
 
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        function resize() { 
+            canvas.width = Math.min(window.innerWidth, 640); 
+            canvas.height = Math.min(window.innerHeight, 480); 
+        }
         resize(); window.addEventListener('resize', resize);
+
+        // --- GENERACIÓN PROCEDIMENTAL DE TEXTURAS Y PATRONES ---
+        const texWall = ctx.createImageData(64, 64);
+        for (let i = 0; i < texWall.data.length; i += 4) {
+            let n = (Math.random() * 20) | 0;
+            texWall.data[i] = 195 + n;
+            texWall.data[i+1] = 180 + n;
+            texWall.data[i+2] = 85 + n;
+            texWall.data[i+3] = 255;
+        }
+
+        const texCarpet = ctx.createImageData(64, 64);
+        for (let i = 0; i < texCarpet.data.length; i += 4) {
+            let n = (Math.random() * 35) | 0;
+            texCarpet.data[i] = 100 + n;
+            texCarpet.data[i+1] = 85 + n;
+            texCarpet.data[i+2] = 40 + n;
+            texCarpet.data[i+3] = 255;
+        }
 
         const MAP_SIZE = 16;
         const mainMap = [
@@ -206,7 +244,7 @@
         ];
 
         let player = { x: 1.5, y: 1.5, angle: 0, bobbing: 0 };
-        let monster = { x: 14.5, y: 14.5, speed: 0.052, active: false, hp: 2 };
+        let monster = { x: 14.5, y: 14.5, speed: 0.052, active: false, hp: 2, animFrame: 0 };
 
         let keyItem = { x: 1.5, y: 14.5, collected: false };
         let chestItem = { x: 14.5, y: 1.5, opened: false };
@@ -215,6 +253,7 @@
         let hasGun = false;
         let hasAmmo = false;
         let recoilTimer = 0;
+        let flickerLight = 1.0;
 
         let lastBellTime = 0;
         let controlMode = 'drag';
@@ -378,10 +417,10 @@
                 crosshairEl.style.display = 'none';
                 document.getElementById('btn-shoot').style.display = 'none';
                 
-                statusEl.innerText = "ESTADO: Zona segura. Todo está tranquilo...";
-                statusEl.style.borderColor = "#444";
-                statusEl.style.color = "#888";
-                vignetteEl.style.background = `radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%)`;
+                statusEl.innerText = "ESTADO: Zona segura. Silencio absoluto...";
+                statusEl.style.borderColor = "#333";
+                statusEl.style.color = "#777";
+                vignetteEl.style.background = `radial-gradient(circle, transparent 40%, rgba(0,0,0,0.95) 100%)`;
                 
                 isDead = false;
             }, 1200);
@@ -447,6 +486,8 @@
                 return;
             }
 
+            monster.animFrame += 0.2;
+
             let mdx = player.x - monster.x;
             let mdy = player.y - monster.y;
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -475,13 +516,13 @@
 
             if (dist < 5) {
                 let danger = Math.min(100, Math.max(0, (1 - (dist / 5)) * 100));
-                vignetteEl.style.background = `radial-gradient(circle, transparent ${100 - danger}%, rgba(120,0,0,0.85) 100%)`;
-                statusEl.innerText = `🚨 ¡TE TIENE CERCA! Monstruo: ${dist.toFixed(1)}m`;
+                vignetteEl.style.background = `radial-gradient(circle, transparent ${80 - danger}%, rgba(150,0,0,0.9) 100%)`;
+                statusEl.innerText = `🚨 ¡TE TIENE CERCA! Distancia: ${dist.toFixed(1)}m`;
                 statusEl.style.borderColor = "#ff0000";
                 statusEl.style.color = "#ff6666";
             } else {
-                vignetteEl.style.background = `radial-gradient(circle, transparent 60%, rgba(0,0,0,0.85) 100%)`;
-                statusEl.innerText = `ESTADO: ¡EL MONSTRUO TE PERSIGUE! (${dist.toFixed(1)}m)`;
+                vignetteEl.style.background = `radial-gradient(circle, transparent 40%, rgba(0,0,0,0.95) 100%)`;
+                statusEl.innerText = `ESTADO: ¡AMENAZA EN PERSECUCIÓN! (${dist.toFixed(1)}m)`;
                 statusEl.style.borderColor = "#c2b144";
                 statusEl.style.color = "#fff9d6";
             }
@@ -495,6 +536,10 @@
             if (!gameStarted || isDead) return;
             let moveSpeed = 0.045; 
             let rotSpeed = 0.045 * sensitivity;
+
+            // Parpadeo de luces aleatorio
+            if (Math.random() < 0.05) flickerLight = 0.3 + Math.random() * 0.7;
+            else flickerLight = Math.min(1.0, flickerLight + 0.05);
 
             if (recoilTimer > 0) recoilTimer--;
 
@@ -520,17 +565,11 @@
             let objIcon = "";
 
             if (!keyItem.collected) {
-                targetObj = keyItem;
-                objName = "Llave";
-                objIcon = "🗝️";
+                targetObj = keyItem; objName = "Llave"; objIcon = "🗝️";
             } else if (!chestItem.opened) {
-                targetObj = chestItem;
-                objName = "Cofre";
-                objIcon = "📦";
+                targetObj = chestItem; objName = "Cofre"; objIcon = "📦";
             } else if (!ammoItem.collected) {
-                targetObj = ammoItem;
-                objName = "Balas";
-                objIcon = "⚡";
+                targetObj = ammoItem; objName = "Balas"; objIcon = "⚡";
             }
 
             if (targetObj) {
@@ -550,7 +589,7 @@
                     }
                 }
             } else {
-                trackerEl.innerText = "OBJETIVO: ¡ELIMINA AL MONSTRUO! 💥";
+                trackerEl.innerText = "OBJETIVO: ¡DESTRUYE A LA ENTIDAD! 💥";
             }
 
             if (!keyItem.collected) {
@@ -585,7 +624,7 @@
         }
 
         function renderCustomObject(objX, objY, zBuffer, numRays, rayWidth, type) {
-            const fov = Math.PI / 3.2;
+            const fov = Math.PI / 3.0;
             let mdx = objX - player.x; let mdy = objY - player.y;
             let dist = Math.sqrt(mdx * mdx + mdy * mdy);
             let angle = Math.atan2(mdy, mdx) - player.angle;
@@ -604,29 +643,24 @@
                         let keySize = size * 0.25;
                         let centerY = top + size * 0.6;
                         ctx.fillStyle = "#ffd700"; ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2;
+                        ctx.shadowColor = "#ff0"; ctx.shadowBlur = 10;
                         ctx.beginPath(); ctx.arc(screenX, centerY - keySize, keySize * 0.4, 0, Math.PI * 2);
                         ctx.fill(); ctx.stroke();
                         ctx.fillRect(screenX - keySize*0.1, centerY - keySize*0.6, keySize*0.2, keySize*1.2);
                         ctx.fillRect(screenX, centerY + keySize*0.2, keySize*0.3, keySize*0.2);
-                        ctx.fillRect(screenX, centerY + keySize*0.4, keySize*0.25, keySize*0.15);
                     } else if (type === 'chest') {
                         let cWidth = size * 0.5; let cHeight = size * 0.35;
                         let centerY = top + size * 0.65;
-                        ctx.fillStyle = "#8b4513";
+                        ctx.fillStyle = "#3a2510";
                         ctx.fillRect(screenX - cWidth/2, centerY - cHeight/2, cWidth, cHeight);
-                        ctx.strokeStyle = "#ffd700"; ctx.lineWidth = 3;
+                        ctx.strokeStyle = "#c2b144"; ctx.lineWidth = 2;
                         ctx.strokeRect(screenX - cWidth/2, centerY - cHeight/2, cWidth, cHeight);
-                        ctx.fillStyle = "#ffd700";
-                        ctx.fillRect(screenX - cWidth*0.1, centerY - cHeight*0.1, cWidth*0.2, cHeight*0.3);
                     } else if (type === 'ammo') {
                         let bWidth = size * 0.08; let bHeight = size * 0.25;
                         let centerY = top + size * 0.65;
                         ctx.fillStyle = "#d4af37";
                         for(let offset of [-bWidth*1.5, 0, bWidth*1.5]) {
                             ctx.fillRect(screenX + offset - bWidth/2, centerY - bHeight/2, bWidth, bHeight);
-                            ctx.fillStyle = "#ff4500";
-                            ctx.beginPath(); ctx.arc(screenX + offset, centerY - bHeight/2, bWidth/2, Math.PI, 0); ctx.fill();
-                            ctx.fillStyle = "#d4af37";
                         }
                     }
                     ctx.restore();
@@ -636,24 +670,25 @@
 
         function renderWeapon() {
             if (!hasGun) return;
-            let bobX = Math.cos(player.bobbing * 0.5) * 8;
-            let bobY = Math.abs(Math.sin(player.bobbing)) * 10;
-            let recoil = recoilTimer * 4;
+            let bobX = Math.cos(player.bobbing * 0.5) * 6;
+            let bobY = Math.abs(Math.sin(player.bobbing)) * 8;
+            let recoil = recoilTimer * 6;
 
-            let gunX = canvas.width - 180 + bobX + recoil;
-            let gunY = canvas.height - 120 + bobY + recoil * 2;
+            let gunX = canvas.width - 160 + bobX + recoil;
+            let gunY = canvas.height - 110 + bobY + recoil * 2;
 
             ctx.save();
             if (recoilTimer > 4) {
-                ctx.fillStyle = '#ffcc00'; ctx.beginPath();
-                ctx.arc(gunX - 50, gunY - 20, 35, 0, Math.PI * 2); ctx.fill();
+                // Fogonazo
+                ctx.fillStyle = '#fff'; ctx.shadowColor = '#f00'; ctx.shadowBlur = 20;
+                ctx.beginPath(); ctx.arc(gunX - 50, gunY - 20, 40, 0, Math.PI * 2); ctx.fill();
             }
-            ctx.fillStyle = '#d2a679'; ctx.beginPath();
-            ctx.ellipse(gunX + 60, gunY + 110, 40, 70, -0.3, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#222'; ctx.fillRect(gunX + 25, gunY + 30, 25, 60);
-            ctx.fillStyle = '#444'; ctx.fillRect(gunX - 40, gunY - 10, 110, 35);
-            ctx.fillStyle = '#111'; ctx.fillRect(gunX - 40, gunY - 10, 110, 12);
-            ctx.fillStyle = '#000'; ctx.fillRect(gunX + 60, gunY - 18, 8, 8);
+            
+            // Cuerpo de la pistola estilo retro
+            ctx.fillStyle = '#111'; ctx.fillRect(gunX - 40, gunY - 10, 110, 30);
+            ctx.fillStyle = '#222'; ctx.fillRect(gunX - 35, gunY - 5, 100, 10);
+            ctx.fillStyle = '#050505'; ctx.fillRect(gunX + 25, gunY + 20, 25, 60); // Empuñadura
+            
             ctx.restore();
         }
 
@@ -662,40 +697,67 @@
             let camOffsetY = Math.sin(player.bobbing) * 6;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = `rgb(107, 99, 52)`; ctx.fillRect(0, 0, canvas.width, halfH + camOffsetY);
-            ctx.fillStyle = `rgb(122, 104, 40)`; ctx.fillRect(0, halfH + camOffsetY, canvas.width, halfH - camOffsetY);
+
+            // RENDERIZADO DE TECHO Y SUELO PROCEDIMENTAL (PISO DE MOQUETA SUACIA)
+            let ceilingGrad = ctx.createLinearGradient(0, 0, 0, halfH);
+            ceilingGrad.addColorStop(0, '#111105');
+            ceilingGrad.addColorStop(1, '#333010');
+            ctx.fillStyle = ceilingGrad;
+            ctx.fillRect(0, 0, canvas.width, halfH + camOffsetY);
+
+            let floorGrad = ctx.createLinearGradient(0, halfH, 0, canvas.height);
+            floorGrad.addColorStop(0, '#221a08');
+            floorGrad.addColorStop(1, '#050401');
+            ctx.fillStyle = floorGrad;
+            ctx.fillRect(0, halfH + camOffsetY, canvas.width, halfH - camOffsetY);
 
             if (!gameStarted) return;
 
-            const fov = Math.PI / 3.2; const numRays = Math.floor(canvas.width / 3);
-            const rayWidth = canvas.width / numRays;
+            const fov = Math.PI / 3.0; const numRays = canvas.width; 
+            const rayWidth = 1;
             let zBuffer = [];
 
+            // RAYCASTING CON SOMBREADO DE LUZ Y DISTORSIÓN
             for (let i = 0; i < numRays; i++) {
                 let rayAngle = (player.angle - fov / 2) + (i / numRays) * fov;
                 let distance = 0; let hit = 0;
                 let cos = Math.cos(rayAngle); let sin = Math.sin(rayAngle);
 
                 while (!hit && distance < 12) {
-                    distance += 0.03;
+                    distance += 0.02;
                     let checkX = Math.floor(player.x + cos * distance);
                     let checkY = Math.floor(player.y + sin * distance);
                     if (checkX < 0 || checkX >= MAP_SIZE || checkY < 0 || checkY >= MAP_SIZE || mainMap[checkY][checkX] === 1) hit = 1;
                 }
+                
                 zBuffer[i] = distance;
                 let correctedDist = distance * Math.cos(rayAngle - player.angle);
-                let wallHeight = (canvas.height / (correctedDist + 0.05));
-                let shadow = Math.max(0, 1 - (correctedDist / 8));
+                let wallHeight = (canvas.height / (correctedDist + 0.001));
+
+                // Cálculo de iluminación fática y parpadeo de Backrooms
+                let lightFactor = Math.max(0, (1 - (correctedDist / 8))) * flickerLight;
+                let r = Math.floor(180 * lightFactor);
+                let g = Math.floor(160 * lightFactor);
+                let b = Math.floor(60 * lightFactor);
 
                 let wallTop = ((canvas.height - wallHeight) / 2) + camOffsetY;
-                ctx.fillStyle = `rgb(${Math.floor(190 * shadow)},${Math.floor(175 * shadow)},${Math.floor(55 * shadow)})`;
-                ctx.fillRect(i * rayWidth, wallTop, rayWidth + 1, wallHeight);
+                
+                // Color de pared estructurada
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(i, wallTop, 1, wallHeight);
+
+                // Sombra superior e inferior para simular relieve volumétrico
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fillRect(i, wallTop, 1, wallHeight * 0.05);
+                ctx.fillRect(i, wallTop + wallHeight * 0.95, 1, wallHeight * 0.05);
             }
 
+            // OBJETOS DEL MAPA
             if (!keyItem.collected) renderCustomObject(keyItem.x, keyItem.y, zBuffer, numRays, rayWidth, 'key');
             if (keyItem.collected && !chestItem.opened) renderCustomObject(chestItem.x, chestItem.y, zBuffer, numRays, rayWidth, 'chest');
             if (ammoItem.visible && !ammoItem.collected) renderCustomObject(ammoItem.x, ammoItem.y, zBuffer, numRays, rayWidth, 'ammo');
 
+            // MONSTRUO/ENTIDAD RENDERING (PSICÓTICO)
             if (monster.active) {
                 let mdx = monster.x - player.x; let mdy = monster.y - player.y;
                 let dist = Math.sqrt(mdx * mdx + mdy * mdy);
@@ -704,26 +766,38 @@
 
                 if (dist > 0.1 && dist < 12 && Math.abs(mAngle) < fov) {
                     let screenX = (canvas.width / 2) + Math.tan(mAngle) * (canvas.width / 2);
-                    let mSize = Math.min(canvas.height, (canvas.height / dist));
-                    let rayIdx = Math.floor(screenX / rayWidth);
+                    let mSize = Math.min(canvas.height * 1.5, (canvas.height / dist));
+                    let rayIdx = Math.floor(screenX);
 
                     if (rayIdx >= 0 && rayIdx < numRays && dist < zBuffer[rayIdx]) {
                         let mTop = ((canvas.height - mSize) / 2) + camOffsetY;
 
-                        ctx.fillStyle = `#0a0a0a`;
-                        ctx.fillRect(screenX - mSize/6, mTop + mSize/3, mSize/3, mSize * 0.7);
-                        ctx.fillStyle = `#151515`;
-                        ctx.beginPath(); ctx.arc(screenX, mTop + mSize/4, mSize/4, 0, Math.PI * 2); ctx.fill();
-                        
-                        ctx.fillStyle = (monster.hp === 1) ? `#ff6600` : `#ff0000`;
-                        ctx.beginPath(); ctx.arc(screenX - mSize/10, mTop + mSize/5, mSize/20, 0, Math.PI * 2); ctx.arc(screenX + mSize/10, mTop + mSize/5, mSize/20, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = `#000000`;
-                        ctx.beginPath(); ctx.ellipse(screenX, mTop + mSize/3, mSize/12, mSize/8, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.save();
+                        // Silueta distorsionada y temblorosa
+                        let glitch = Math.sin(monster.animFrame) * 4;
+                        ctx.fillStyle = `#000`;
+                        ctx.beginPath();
+                        ctx.ellipse(screenX + glitch, mTop + mSize*0.5, mSize*0.15, mSize*0.45, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Ojos brillantes amenazantes
+                        ctx.fillStyle = monster.hp === 1 ? `#ffaa00` : `#ff0000`;
+                        ctx.shadowColor = '#f00'; ctx.shadowBlur = 15;
+                        ctx.beginPath();
+                        ctx.arc(screenX - mSize*0.05 + glitch, mTop + mSize*0.3, Math.max(1, mSize*0.02), 0, Math.PI * 2);
+                        ctx.arc(screenX + mSize*0.05 + glitch, mTop + mSize*0.3, Math.max(1, mSize*0.02), 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.restore();
                     }
                 }
             }
 
             renderWeapon();
+
+            // GRA NULARIDAD / RUIDO DE CÁMARA VHS
+            ctx.fillStyle = `rgba(255,255,255,${0.015 + Math.random() * 0.03})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         function gameLoop() { update(); render(); requestAnimationFrame(gameLoop); }
@@ -731,17 +805,5 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
 
 
