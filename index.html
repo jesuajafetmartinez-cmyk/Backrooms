@@ -57,7 +57,7 @@
             padding: 4px 8px; font-size: 10px; border-radius: 3px; letter-spacing: 1px;
         }
 
-        #start-screen, #win-screen, #pause-screen {
+        #start-screen, #pause-screen {
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(4, 4, 2, 0.95); z-index: 200; display: flex;
             flex-direction: column; justify-content: center; align-items: center; text-align: center;
@@ -65,6 +65,20 @@
         }
 
         #pause-screen { display: none; z-index: 250; }
+
+        /* CINEMÁTICA OVERLAY */
+        #cinematic-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 300; display: none; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+            padding: 30px; color: #fff; overflow: hidden;
+        }
+
+        #cinematic-text {
+            font-size: 18px; line-height: 1.8; max-width: 600px;
+            color: #d4af37; text-shadow: 0 0 10px rgba(212,175,55,0.5);
+            margin-bottom: 30px; min-height: 120px;
+        }
 
         .controls-selector {
             margin-top: 15px; background: rgba(255,255,255,0.02); padding: 12px;
@@ -199,11 +213,10 @@
         <button class="btn-screen" onclick="quitToMenu()">MENÚ PRINCIPAL</button>
     </div>
 
-    <!-- PANTALLA DE VICTORIA -->
-    <div id="win-screen" style="display: none;">
-        <h1 style="color: #44c25d; margin-bottom: 10px;">AMENAZA NEUTRALIZADA</h1>
-        <p style="color: #aaa; font-size: 13px;">Has sobrevivido a la cacería en el complejo.</p>
-        <button class="btn-screen" onclick="location.reload()">REINICIAR SIMULACIÓN</button>
+    <!-- CINEMÁTICA DE FINAL / METAMORFOSIS -->
+    <div id="cinematic-overlay">
+        <div id="cinematic-text">...La bestia ha caído. Sin embargo, el silencio es desgarrador.</div>
+        <button class="btn-screen" id="btn-restart-cinematic" style="display:none;" onclick="location.reload()">REINICIAR SIMULACIÓN</button>
     </div>
 
     <div id="jumpscare-overlay">
@@ -298,7 +311,7 @@
         let monster = { 
             x: 45.5, y: 45.5, 
             speed: 0.025,
-            aggressiveSpeed: 0.068,
+            aggressiveSpeed: 0.078, 
             isAggressive: false, 
             hp: 2, 
             animFrame: 0,
@@ -326,6 +339,7 @@
         let keys = { fwd: false, back: false, left: false, right: false, strafeLeft: false, strafeRight: false };
         let audioCtx = null, monsterGain = null, humGain = null;
         let gameStarted = false, isDead = false, isPaused = false;
+        let isCinematic = false;
 
         let screenShake = 0;
 
@@ -414,7 +428,7 @@
         }
 
         function togglePause() {
-            if (!gameStarted || isDead) return;
+            if (!gameStarted || isDead || isCinematic) return;
             isPaused = !isPaused;
             document.getElementById('pause-screen').style.display = isPaused ? 'flex' : 'none';
             if (audioCtx) {
@@ -425,7 +439,9 @@
 
         function resetGame() {
             document.getElementById('pause-screen').style.display = 'none';
+            document.getElementById('cinematic-overlay').style.display = 'none';
             isPaused = false;
+            isCinematic = false;
             
             player.x = 1.5; player.y = 1.5; player.angle = 0;
             monster.x = 45.5; monster.y = 45.5;
@@ -452,11 +468,13 @@
         function quitToMenu() {
             document.getElementById('pause-screen').style.display = 'none';
             document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('cinematic-overlay').style.display = 'none';
             document.getElementById('btn-pause').style.display = 'none';
             document.getElementById('ui').style.display = 'none';
             
             gameStarted = false;
             isPaused = false;
+            isCinematic = false;
             resetGame();
         }
 
@@ -464,7 +482,7 @@
             const tiempoEspera = Math.floor(Math.random() * 8000) + 8000;
 
             setTimeout(() => {
-                if (!isDead && !isPaused && gameStarted) {
+                if (!isDead && !isPaused && gameStarted && !isCinematic) {
                     targetLight = 0.5 + Math.random() * 0.2;
                     setTimeout(() => {
                         targetLight = 1.0;
@@ -478,14 +496,14 @@
 
         let touchStartX = null;
         window.addEventListener('touchstart', (e) => {
-            if (!gameStarted || isPaused || controlMode !== 'drag') return;
+            if (!gameStarted || isPaused || isCinematic || controlMode !== 'drag') return;
             for (let t of e.changedTouches) {
                 if (!e.target.classList.contains('btn')) touchStartX = t.clientX;
             }
         });
 
         window.addEventListener('touchmove', (e) => {
-            if (!gameStarted || isPaused || controlMode !== 'drag' || touchStartX === null) return;
+            if (!gameStarted || isPaused || isCinematic || controlMode !== 'drag' || touchStartX === null) return;
             for (let t of e.changedTouches) {
                 let deltaX = t.clientX - touchStartX;
                 player.angle += deltaX * 0.005 * sensitivity;
@@ -500,7 +518,7 @@
                 togglePause();
                 return;
             }
-            if (!gameStarted || isPaused) return;
+            if (!gameStarted || isPaused || isCinematic) return;
             let k = e.key.toLowerCase();
             if (k === 'w') keys.fwd = true;
             if (k === 's') keys.back = true;
@@ -512,7 +530,7 @@
         });
 
         window.addEventListener('keyup', (e) => {
-            if (!gameStarted || isPaused) return;
+            if (!gameStarted || isPaused || isCinematic) return;
             let k = e.key.toLowerCase();
             if (k === 'w') keys.fwd = false;
             if (k === 's') keys.back = false;
@@ -592,7 +610,7 @@
         }
 
         function triggerJumpscare() {
-            if (isDead) return;
+            if (isDead || isCinematic) return;
             isDead = true;
             playScream();
             const overlay = document.getElementById('jumpscare-overlay');
@@ -605,8 +623,73 @@
             }, 1200);
         }
 
+        function triggerEndCinematic() {
+            isCinematic = true;
+            document.getElementById('ui').style.display = 'none';
+            document.getElementById('btn-pause').style.display = 'none';
+            crosshairEl.style.display = 'none';
+            
+            if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            if (humGain) humGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            const overlay = document.getElementById('cinematic-overlay');
+            const cText = document.getElementById('cinematic-text');
+            const restartBtn = document.getElementById('btn-restart-cinematic');
+            overlay.style.display = 'flex';
+
+            const phrases = [
+                "La criatura yace inerte en el piso alfombrado...",
+                "El peligro ha terminado. Sin embargo... la salida nunca apareció.",
+                "Pasan las horas... los días... El zumbido de las luces amarillas se vuelve insoportable.",
+                "Empiezas a olvidar tu nombre. Empiezas a olvidar qué era la luz del sol.",
+                "La soledad y la humedad devoran tu mente lentamente...",
+                "Tu piel cambia. Tu cuerpo se deforma. La oscuridad te abraza.",
+                "Ya no buscas la salida...",
+                "AHORA TÚ ERES LA ENTIDAD DE LOS BACKROOMS."
+            ];
+
+            let index = 0;
+            
+            function showNextPhrase() {
+                if (index < phrases.length) {
+                    cText.style.opacity = '0';
+                    cText.style.transition = 'opacity 0.8s';
+                    setTimeout(() => {
+                        cText.innerText = phrases[index];
+                        cText.style.opacity = '1';
+
+                        // Efectos de sonido dramáticos para la locura
+                        if (audioCtx) {
+                            let osc = audioCtx.createOscillator();
+                            let gain = audioCtx.createGain();
+                            osc.type = index === phrases.length - 1 ? 'sawtooth' : 'sine';
+                            osc.frequency.setValueAtTime(80 - index * 6, audioCtx.currentTime);
+                            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+                            osc.connect(gain); gain.connect(audioCtx.destination);
+                            osc.start(); osc.stop(audioCtx.currentTime + 1.2);
+                        }
+
+                        if (index === phrases.length - 1) {
+                            cText.style.color = "#ff2222";
+                            cText.style.fontSize = "22px";
+                            cText.style.textShadow = "0 0 20px #f00";
+                            overlay.style.background = "radial-gradient(circle, #300 0%, #000 80%)";
+                        }
+
+                        index++;
+                        setTimeout(showNextPhrase, 3800);
+                    }, 800);
+                } else {
+                    restartBtn.style.display = 'inline-block';
+                }
+            }
+
+            showNextPhrase();
+        }
+
         function shoot() {
-            if (!hasGun || !hasAmmo || isPaused) return;
+            if (!hasGun || !hasAmmo || isPaused || isCinematic) return;
             playGunshotSound();
             recoilTimer = 8;
 
@@ -617,16 +700,16 @@
             while (mAngle < -Math.PI) mAngle += Math.PI * 2;
             while (mAngle > Math.PI) mAngle -= Math.PI * 2;
 
-            if (dist < 10 && Math.abs(mAngle) < 0.4) {
+            if (dist < 10 && Math.abs(mAngle) < 0.45) {
                 monster.hp--;
                 playMonsterHurtSound();
 
                 if (monster.hp <= 0) {
-                    if (monsterGain) monsterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-                    document.getElementById('win-screen').style.display = 'flex';
+                    triggerEndCinematic();
                 } else {
-                    monster.x -= (mdx / dist) * 1.5;
-                    monster.y -= (mdy / dist) * 1.5;
+                    screenShake = 15;
+                    monster.x -= (mdx / dist) * 1.8;
+                    monster.y -= (mdy / dist) * 1.8;
                 }
             }
         }
@@ -740,23 +823,34 @@
                 }
 
             } else {
+                // MODO AGRESIVO: PERSECUCIÓN DIRECTA CON RESOLUCIÓN DE COLISIÓN
                 let moveX = (mdx / dist) * monster.aggressiveSpeed;
                 let moveY = (mdy / dist) * monster.aggressiveSpeed;
 
-                if (canMoveTo(monster.x + moveX, monster.y + moveY, 0.3)) {
-                    monster.x += moveX;
-                    monster.y += moveY;
+                let stepX = monster.x + moveX;
+                let stepY = monster.y + moveY;
+
+                if (canMoveTo(stepX, stepY, 0.3)) {
+                    monster.x = stepX;
+                    monster.y = stepY;
+                } else if (canMoveTo(stepX, monster.y, 0.3)) {
+                    monster.x = stepX;
+                } else if (canMoveTo(monster.x, stepY, 0.3)) {
+                    monster.y = stepY;
                 } else {
-                    if (canMoveTo(monster.x + moveX, monster.y, 0.3)) monster.x += moveX;
-                    else if (canMoveTo(monster.x, monster.y + moveY, 0.3)) monster.y += moveY;
+                    // Deslizamiento inteligente en esquinas cuando se atasca
+                    let altX = monster.x + (mdx > 0 ? 0.05 : -0.05);
+                    let altY = monster.y + (mdy > 0 ? 0.05 : -0.05);
+                    if (canMoveTo(altX, monster.y, 0.3)) monster.x = altX;
+                    if (canMoveTo(monster.x, altY, 0.3)) monster.y = altY;
                 }
 
                 if (audioCtx && monsterGain) {
                     let vol = Math.max(0.1, 1 - (dist / 20));
-                    monsterGain.gain.setValueAtTime(vol * 0.8, audioCtx.currentTime);
+                    monsterGain.gain.setValueAtTime(vol * 0.9, audioCtx.currentTime);
                 }
 
-                let danger = Math.min(100, Math.max(0, (1 - (dist / 8)) * 100));
+                let danger = Math.min(100, Math.max(0, (1 - (dist / 10)) * 100));
                 vignetteEl.style.background = `radial-gradient(circle, transparent ${55 - danger}%, rgba(180,0,0,0.95) 100%)`;
                 statusEl.innerText = `🚨 ¡TE HA DETECTADO! CORRE (${dist.toFixed(1)}m)`;
                 statusEl.style.borderColor = "#ff0000";
@@ -769,7 +863,7 @@
         }
 
         function update() {
-            if (!gameStarted || isDead || isPaused) return;
+            if (!gameStarted || isDead || isPaused || isCinematic) return;
             let moveSpeed = 0.055; 
             let rotSpeed = 0.045 * sensitivity;
 
@@ -858,7 +952,7 @@
                 if (Math.sqrt(adx*adx + ady*ady) < 0.8) {
                     ammoItem.collected = true;
                     hasAmmo = true;
-                    monster.isAggressive = true;
+                    monster.isAggressive = true; // SE VUELVE AGRESIVO DE INMEDIATO
                     playPickupSound();
                     if (controlMode !== 'pc') document.getElementById('btn-shoot').style.display = 'flex';
                 }
@@ -1022,7 +1116,7 @@
             renderCeilingLights(halfH, camOffsetY);
             renderTexturedFloor(halfH, camOffsetY);
 
-            if (!gameStarted) { ctx.restore(); return; }
+            if (!gameStarted || isCinematic) { ctx.restore(); return; }
 
             const fov = Math.PI / 3.0; const numRays = canvas.width; 
             const rayWidth = 1;
@@ -1111,6 +1205,7 @@
     </script>
 </body>
 </html>
+
 
 
 
