@@ -466,6 +466,19 @@
             osc.start(); osc.stop(audioCtx.currentTime + 0.2);
         }
 
+        function playShadowVanishSound() {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.18);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+        }
+
         function triggerRandomScreamer() {
             if (isDead) return;
             playDistortedScreamerSound();
@@ -578,17 +591,27 @@
             let now = Date.now();
 
             if (!activeShadow && now > nextShadowSpawnTime) {
-                // Aparecen dentro del campo de visión del jugador (frente a él)
-                let spawnAngle = player.angle + (Math.random() - 0.5) * 0.8;
-                let dist = 2.5 + Math.random() * 2.0;
-                let sx = player.x + Math.cos(spawnAngle) * dist;
-                let sy = player.y + Math.sin(spawnAngle) * dist;
+                // Raycasting frontal para encontrar exactamente dónde está el pasillo visible sin traspasar paredes
+                let step = 0.2;
+                let foundPos = null;
 
-                if (canMoveTo(sx, sy, 0.2)) {
-                    activeShadow = { x: sx, y: sy, opacity: 0.95, isFading: false };
+                for (let d = 1.8; d <= 3.5; d += step) {
+                    let testAngle = player.angle + (Math.random() - 0.5) * 0.4;
+                    let sx = player.x + Math.cos(testAngle) * d;
+                    let sy = player.y + Math.sin(testAngle) * d;
+
+                    if (canMoveTo(sx, sy, 0.2)) {
+                        foundPos = { x: sx, y: sy };
+                        break;
+                    }
                 }
-                // Frecuencia alta: entre 4 y 8 segundos
-                nextShadowSpawnTime = now + 4000 + Math.random() * 4000;
+
+                if (foundPos) {
+                    activeShadow = { x: foundPos.x, y: foundPos.y, opacity: 0.95, isFading: false, soundPlayed: false };
+                }
+
+                // Frecuencia extremadamente alta (2 a 4 segundos)
+                nextShadowSpawnTime = now + 2000 + Math.random() * 2000;
             }
 
             if (activeShadow) {
@@ -596,12 +619,17 @@
                 let sdy = activeShadow.y - player.y;
                 let sDist = Math.sqrt(sdx * sdx + sdy * sdy);
 
-                if (sDist < 1.8) {
+                // Desaparecen cuando estás LITERALMENTE enfrente (menos de 1.0 metro)
+                if (sDist < 1.0 && !activeShadow.isFading) {
                     activeShadow.isFading = true;
+                    if (!activeShadow.soundPlayed) {
+                        playShadowVanishSound();
+                        activeShadow.soundPlayed = true;
+                    }
                 }
 
                 if (activeShadow.isFading) {
-                    activeShadow.opacity -= 0.08;
+                    activeShadow.opacity -= 0.12;
                     if (activeShadow.opacity <= 0) {
                         activeShadow = null;
                     }
@@ -739,7 +767,7 @@
                     keyItem.collected = true;
                     playPickupSound();
                     nextRandomScreamerTime = Date.now() + 15000 + Math.random() * 20000;
-                    nextShadowSpawnTime = Date.now() + 2000; // Aparece la primera sombra en 2 segundos
+                    nextShadowSpawnTime = Date.now() + 1000; // La primera sombra aparece a 1 segundo de tomar la llave
                     statusEl.innerText = "ESTADO: SIENTES SOMBRAS MERODEANDO...";
                     statusEl.style.color = "#ff8833";
                 }
@@ -1016,4 +1044,5 @@
     </script>
 </body>
 </html>
+
 
